@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>djjsindy</title>
+	<meta name="description" content="">
+	<meta name="author" content="djjsindy">
+
+	<!-- HTML5 shim, for IE6-8 support of HTML elements -->
+	<!--[if lt IE 9]>
+		<script src="/theme/html5.js"></script>
+	<![endif]-->
+
+	<!-- Styles -->
+	<link href="/theme/bootstrap.min.css" rel="stylesheet">
+	<link href="/theme/local.css" rel="stylesheet">
+	<link href="/theme/pygments.css" rel="stylesheet">
+
+    <!-- Feeds -->
+        <link href="/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="djjsindy Atom Feed" />
+        
+	<script>var _gaq=[['_setAccount','UA-43260693-1'],['_trackPageview']];(function(d,t){var g=d.createElement(t),s=d.getElementsByTagName(t)[0];g.src='//www.google-analytics.com/ga.js';s.parentNode.insertBefore(g,s)}(document,'script'))</script>
+	</head>
+<body>
+			<div class="topbar">
+	  <div class="topbar-inner">
+		<div class="container-fluid">
+		  <a class="brand" href="/">djjsindy</a>
+			<ul class="nav">
+																										<li class="active"><a href="/category/nginx.html">nginx</a></li>
+							</ul>
+			<p class="pull-right"><a href="/archives.html">[archives]</a> <a href="/tags.html">[tags]</a></p>
+		</div>
+	  </div>
+	</div>
+
+	<div class="container-fluid">
+	  <div class="sidebar">
+		<div class="well">
+			<h3>Blogroll</h3>
+			<ul>
+								<li><a href="http://getpelican.com/">Pelican</a></li>
+								<li><a href="http://python.org/">Python.org</a></li>
+								<li><a href="http://jinja.pocoo.org/">Jinja2</a></li>
+								<li><a href="#">You can modify those links in your config file</a></li>
+							</ul>
+			<div class="social">
+			<h3>Social</h3>
+			<ul>
+								<li><a href="#">You can add links in your config file</a></li>
+								<li><a href="#">Another social link</a></li>
+							</ul>
+			</div>
+		</div>
+	  </div>
+	  <div class="content">
+							<div class='article'>
+		<div class="page-header"><h1>图解Nginx 中的4级指针</h1></div>
+		<div class="well small">Permalink: <a class="more" href="/nginx-pointer.html">2013-08-08 22:45:00</a>
+by <a class="url fn" href="/author/djjsindy.html">djjsindy </a>
+ in <a href="/category/nginx.html">nginx</a>
+tags: <a href="/tag/nginx.html">nginx</a> </div>
+		<div><p>nginx的所有配置结构体全部放在一个cycle的四级指针中，本文就具体分析一下每级指针究竟指向的是什么,下图表示了这个四级指针每一级的指向,图中虚拟地址模拟了真实地址，ctx指针存的指向虚拟地址为1的数据，图中只列举出core，event，http模块最基础的配置结构。   </p>
+<p><img alt="Alt text" src="https://lh6.googleusercontent.com/-EvDQj2yRuCU/UhCCwPNtrFI/AAAAAAAAAJw/QPY2xNu2zzM/s576/Screen%2520Shot%25202013-08-08%2520at%252010.33.57%2520PM.png" /></p>
+<p>需要注意得是，从图中不难发现，对于常用的模块，core模块，event模块，http模块，core模块只需要2级指针就能搞定，event模块按照逻辑只需要3级指针，而http模块需要4级指针。event按照常理缺少了http模块中间那个虚拟地址1000的结构体（区分main conf，serv conf，loc conf），需要3级指针就行。但是nginx为了方便配置，也在event模块中间也加入了类似的一个结构体指针（虚拟地址75存储100 的指针），不过这个指针直接指向了event模块的指针。这样event模块和http模块一样也形成了4级指针，这样设计event模块我认为是为了兼容http模块配置才形成了4级指针。</p>
+<p>从代码切入，看一下ctx的初始化过程。</p>
+<div class="highlight"><pre><span class="n">cycle</span><span class="o">-&gt;</span><span class="n">conf_ctx</span> <span class="o">=</span> <span class="n">ngx_pcalloc</span><span class="p">(</span><span class="n">pool</span><span class="p">,</span> <span class="n">ngx_max_module</span> <span class="o">*</span> <span class="k">sizeof</span><span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">));</span>
+</pre></div>
+
+
+<p>这段代码初始化了cycle的context，conf_ctx指向一段空间，每个地址存储void ＊的指针，这个指针能指向任何的一段空间，也就是各种conf结构体。
+     以下代码为第一层指针赋值，也就是每个conf_ctx每个空间存储第一层conf的结构体的首地址，这类conf的结构体不会包含event，http模块的，因为nginx并不确定配置一定有event和http模块的配置，所以在conf文件中没有碰到event和http的时候，是不会建立对应的结构体的。</p>
+<div class="highlight"><pre><span class="k">for</span> <span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">ngx_modules</span><span class="p">[</span><span class="n">i</span><span class="p">];</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">ngx_modules</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">type</span> <span class="o">!=</span> <span class="n">NGX_CORE_MODULE</span><span class="p">)</span> <span class="p">{</span>     <span class="c1">//加载core module,log module等</span>
+        <span class="k">continue</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">module</span> <span class="o">=</span> <span class="n">ngx_modules</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">ctx</span><span class="p">;</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">module</span><span class="o">-&gt;</span><span class="n">create_conf</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">rv</span> <span class="o">=</span> <span class="n">module</span><span class="o">-&gt;</span><span class="n">create_conf</span><span class="p">(</span><span class="n">cycle</span><span class="p">);</span>              <span class="c1">//rv 是conf结构体首地址</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">rv</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>
+            <span class="n">ngx_destroy_pool</span><span class="p">(</span><span class="n">pool</span><span class="p">);</span>
+            <span class="k">return</span> <span class="nb">NULL</span><span class="p">;</span>
+        <span class="p">}</span> 
+        <span class="n">cycle</span><span class="o">-&gt;</span><span class="n">conf_ctx</span><span class="p">[</span><span class="n">ngx_modules</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">rv</span><span class="p">;</span> <span class="c1">//conf_ctx每个空间存储conf的首地址，构造了两层指针</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<p>下面的代码是解析command，获得这个command的conf结构体</p>
+<ol>
+<li>NGX_DIRECT_CONF表示ngx_core_module,也就是配置中最外边配置的那些参数，因为 ngx_core_module,所对应的conf结构体，在初始化的时候已经创建好了，所以再ctx[index]的位 置是有conf的首地址的指针的，相当于图中虚拟地址50，后面在set command到结构体的时候，只需要把这个指针传过去就行了，这里ctx 2级指针是说明ctx一级指针指向的存储conf的首地址虚拟地址1，ctx二级指针指向conf的首地址，相当于图中虚拟地址50。</li>
+<li>NGX_MAIN_CONF表示events http的配置，也就是说在cycle初始化的时候并不会初始化这些conf，前面说了因为我们根本不确定这些配置项是否真的有。所以在碰到events 或者http那种配置项的时候，那么就是初始化这一类配置项的时候，首先需要在ctx的相应位置赋值他们core conf module的结构体。因为之前ctx在这个位置并没有任何指向结构体的指针。所以把ctx位置的指针（虚拟地址2）赋值给conf，让后面的set函数，为这个位置赋值配置项结构体的首地址。</li>
+</ol>
+<p><img alt="Alt text" src="https://lh6.googleusercontent.com/-gDhkSPbxjig/UhCCxLCholI/AAAAAAAAACk/lMNtzNIT0iY/s1024/Screen%2520Shot%25202013-08-08%2520at%252010.38.53%2520PM.png" /></p>
+<p>对于第三个位置注释的代码说明，应该还是先说说event模块的加载，下面的代码是nginx events模块set函数
+    ctx = ngx_pcalloc(cf-&gt;pool, sizeof(void *)); //建立一个指针，虚拟地址75 （为了兼容http模块的4级指针的指针，图中红色的位置）
+    if (ctx == NULL) {
+        return NGX_CONF_ERROR;
+    } </p>
+<div class="highlight"><pre><span class="o">*</span><span class="n">ctx</span> <span class="o">=</span> <span class="n">ngx_pcalloc</span><span class="p">(</span><span class="n">cf</span><span class="o">-&gt;</span><span class="n">pool</span><span class="p">,</span> <span class="n">ngx_event_max_module</span> <span class="o">*</span> <span class="k">sizeof</span><span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">));</span> <span class="c1">//可以看到 event模块位置被赋值了一段空间，相当于ctx指向虚拟地址100，也就是虚拟地址75存储了100，相当于图中标黄色的过程1</span>
+<span class="k">if</span> <span class="p">(</span><span class="o">*</span><span class="n">ctx</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="n">NGX_CONF_ERROR</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="o">*</span><span class="p">(</span><span class="kt">void</span> <span class="o">**</span><span class="p">)</span> <span class="n">conf</span> <span class="o">=</span> <span class="n">ctx</span><span class="p">;</span> <span class="c1">//所以这里conf相当于虚拟地址2的地方存储是首地址为75的指针，相当于图中标红的过程2</span>
+
+<span class="k">for</span> <span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">ngx_modules</span><span class="p">[</span><span class="n">i</span><span class="p">];</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">ngx_modules</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">type</span> <span class="o">!=</span> <span class="n">NGX_EVENT_MODULE</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">continue</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">m</span> <span class="o">=</span> <span class="n">ngx_modules</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">ctx</span><span class="p">;</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">m</span><span class="o">-&gt;</span><span class="n">create_conf</span><span class="p">)</span> <span class="p">{</span>
+        <span class="p">(</span><span class="o">*</span><span class="n">ctx</span><span class="p">)[</span><span class="n">ngx_modules</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">ctx_index</span><span class="p">]</span> <span class="o">=</span> <span class="n">m</span><span class="o">-&gt;</span><span class="n">create_conf</span><span class="p">(</span><span class="n">cf</span><span class="o">-&gt;</span><span class="n">cycle</span><span class="p">);</span> <span class="c1">//相当于图中标绿的过程3</span>
+        <span class="k">if</span> <span class="p">((</span><span class="o">*</span><span class="n">ctx</span><span class="p">)[</span><span class="n">ngx_modules</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">ctx_index</span><span class="p">]</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>               <span class="c1">//相当于地址为100的位置存储首地址600，600是event core module的位置，虚拟地址101的地方存储首地址700，700是event epoll模块的结构体的首地址</span>
+            <span class="k">return</span> <span class="n">NGX_CONF_ERROR</span><span class="p">;</span>
+        <span class="p">}</span> 
+    <span class="p">}</span> 
+<span class="p">}</span>
+
+<span class="n">pcf</span> <span class="o">=</span> <span class="o">*</span><span class="n">cf</span><span class="p">;</span> 
+<span class="n">cf</span><span class="o">-&gt;</span><span class="n">ctx</span> <span class="o">=</span> <span class="n">ctx</span><span class="p">;</span> <span class="c1">//重新赋值虚拟地址75的指针，继续解析配置。</span>
+<span class="n">cf</span><span class="o">-&gt;</span><span class="n">module_type</span> <span class="o">=</span> <span class="n">NGX_EVENT_MODULE</span><span class="p">;</span>
+<span class="n">cf</span><span class="o">-&gt;</span><span class="n">cmd_type</span> <span class="o">=</span> <span class="n">NGX_EVENT_CONF</span><span class="p">;</span>
+
+<span class="n">rv</span> <span class="o">=</span> <span class="n">ngx_conf_parse</span><span class="p">(</span><span class="n">cf</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">);</span>
+</pre></div>
+
+
+<p>从上面的代码可以看出event模块的四级指针确实有些牵强，完全可以省略虚拟地址75位置的指针，虚拟地址2的位置直接存储100，不省略的原因正是前面说的原因，为了兼容http模块的配置，再看下http的代码</p>
+<p><img alt="Alt text" src="https://lh5.googleusercontent.com/-9I2BjhwFt3U/UhCCzZtL9bI/AAAAAAAAACs/ISULGqMKK-Y/s1024/Screen%2520Shot%25202013-08-08%2520at%252010.40.34%2520PM.png" /></p>
+<div class="highlight"><pre><span class="n">ctx</span> <span class="o">=</span> <span class="n">ngx_pcalloc</span><span class="p">(</span><span class="n">cf</span><span class="o">-&gt;</span><span class="n">pool</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="kt">ngx_http_conf_ctx_t</span><span class="p">));</span>
+<span class="k">if</span> <span class="p">(</span><span class="n">ctx</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="n">NGX_CONF_ERROR</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="o">*</span><span class="p">(</span><span class="kt">ngx_http_conf_ctx_t</span> <span class="o">**</span><span class="p">)</span> <span class="n">conf</span> <span class="o">=</span> <span class="n">ctx</span><span class="p">;</span> <span class="c1">//相当于图中标红的过程1</span>
+
+<span class="n">ngx_http_max_module</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> 
+<span class="k">for</span> <span class="p">(</span><span class="n">m</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">ngx_modules</span><span class="p">[</span><span class="n">m</span><span class="p">];</span> <span class="n">m</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">ngx_modules</span><span class="p">[</span><span class="n">m</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">type</span> <span class="o">!=</span> <span class="n">NGX_HTTP_MODULE</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">continue</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">ngx_modules</span><span class="p">[</span><span class="n">m</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">ctx_index</span> <span class="o">=</span> <span class="n">ngx_http_max_module</span><span class="o">++</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">ctx</span><span class="o">-&gt;</span><span class="n">main_conf</span> <span class="o">=</span> <span class="n">ngx_pcalloc</span><span class="p">(</span><span class="n">cf</span><span class="o">-&gt;</span><span class="n">pool</span><span class="p">,</span>
+                             <span class="k">sizeof</span><span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">)</span> <span class="o">*</span> <span class="n">ngx_http_max_module</span><span class="p">);</span> <span class="c1">//相当于图中标黄的过程2</span>
+<span class="k">if</span> <span class="p">(</span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">main_conf</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="n">NGX_CONF_ERROR</span><span class="p">;</span>
+<span class="p">}</span>
+<span class="n">ctx</span><span class="o">-&gt;</span><span class="n">srv_conf</span> <span class="o">=</span> <span class="n">ngx_pcalloc</span><span class="p">(</span><span class="n">cf</span><span class="o">-&gt;</span><span class="n">pool</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">)</span> <span class="o">*</span> <span class="n">ngx_http_max_module</span><span class="p">);</span>
+<span class="k">if</span> <span class="p">(</span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">srv_conf</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="n">NGX_CONF_ERROR</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">ctx</span><span class="o">-&gt;</span><span class="n">loc_conf</span> <span class="o">=</span> <span class="n">ngx_pcalloc</span><span class="p">(</span><span class="n">cf</span><span class="o">-&gt;</span><span class="n">pool</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">)</span> <span class="o">*</span> <span class="n">ngx_http_max_module</span><span class="p">);</span>
+<span class="k">if</span> <span class="p">(</span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">loc_conf</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="n">NGX_CONF_ERROR</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">for</span> <span class="p">(</span><span class="n">m</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">ngx_modules</span><span class="p">[</span><span class="n">m</span><span class="p">];</span> <span class="n">m</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">ngx_modules</span><span class="p">[</span><span class="n">m</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">type</span> <span class="o">!=</span> <span class="n">NGX_HTTP_MODULE</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">continue</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">module</span> <span class="o">=</span> <span class="n">ngx_modules</span><span class="p">[</span><span class="n">m</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">ctx</span><span class="p">;</span>
+    <span class="n">mi</span> <span class="o">=</span> <span class="n">ngx_modules</span><span class="p">[</span><span class="n">m</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">ctx_index</span><span class="p">;</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">module</span><span class="o">-&gt;</span><span class="n">create_main_conf</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">ctx</span><span class="o">-&gt;</span><span class="n">main_conf</span><span class="p">[</span><span class="n">mi</span><span class="p">]</span> <span class="o">=</span> <span class="n">module</span><span class="o">-&gt;</span><span class="n">create_main_conf</span><span class="p">(</span><span class="n">cf</span><span class="p">);</span> <span class="c1">//相当于图中标绿色的过程3</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">main_conf</span><span class="p">[</span><span class="n">mi</span><span class="p">]</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>
+            <span class="k">return</span> <span class="n">NGX_CONF_ERROR</span><span class="p">;</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+</pre></div>
+
+
+<p>看完了上面http模块的初始化，应该就了解前面代码的用意：</p>
+<div class="highlight"><pre>    <span class="n">confp</span> <span class="o">=</span> <span class="o">*</span><span class="p">(</span><span class="kt">void</span> <span class="o">**</span><span class="p">)</span> <span class="p">((</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span> <span class="n">cf</span><span class="o">-&gt;</span><span class="n">ctx</span> <span class="o">+</span> <span class="n">cmd</span><span class="o">-&gt;</span><span class="n">conf</span><span class="p">);</span> 
+    <span class="k">if</span> <span class="p">(</span><span class="n">confp</span><span class="p">)</span> <span class="p">{</span>
+     <span class="n">conf</span> <span class="o">=</span> <span class="n">confp</span><span class="p">[</span><span class="n">ngx_modules</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">ctx_index</span><span class="p">];</span>
+         <span class="p">}</span>
+</pre></div>
+
+
+<p>在初始化完event模块之后，cf-&gt;ctx存储的就是75,event模块的cmd-&gt;conf都是0，因为这个cf-&gt;ctx一个兼容指针，所以confp指向的就是虚拟地址100，那么后面的代码根据模块的ctx_index就可以得到conf 了。
+     对于http模块cf-&gt;ctx存储的是1000，那么cmd-&gt;conf对于http模块不是0，在结构体ngx_http_conf_ctx_t中main，srv，loc有不同的位移，后面的逻辑和event一致，所以event模块的四级指针只是为了兼容http模块而多设了一层指针，那层指针充当了http指向ngx_http_conf_ctx_t结构体作用，这层对event模块是没有什么用的，对于http模块来说可以区分是main，srv，loc的配置。</p>
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-43260693-1', 'djjsindy.github.io');
+  ga('send', 'pageview');
+
+</script></div>
+		<div>
+			<h2>Comments</h2>
+		 									<div>
+	</div>	
+		<footer>
+		  <p>Powered by <a href="http://getpelican.com/">Pelican</a>. Theme based on <a href="http://twitter.github.com/bootstrap/">Twitter Bootstrap</a>.</p>
+		  <p>&copy; djjsindy</p>
+		</footer>
+	  </div>
+
+	</div>
+</body>
+</html>
