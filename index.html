@@ -75,12 +75,30 @@ tags: <a href="/tag/tomcat.html">tomcat</a> </div>
 	</div>
 </div>	
 <div class='article'>
+	<h2>tomcat的异步servlet处理</h2>
+	<div class="well small">Permalink: <a class="more" href="/tomcat-async.html">2013-07-17 12:02:00</a>
+by <a class="url fn" href="/author/djjsindy.html">djjsindy </a>
+ in <a href="/category/tomcat.html">tomcat</a>
+tags: <a href="/tag/tomcat.html">tomcat</a> </div>
+	<div class="summary"><p>这个是以前看的，由于最近工作中用到异步servlet，看了一下tomcat在对servlet3.0中AsyncContext的实现过程，总结一下，使用异步servlet主要原因就是因为，在service方法中业务逻辑如果碰到io操作时间比较长的操作，这样这个service方法就会长时间占用tomcat容器线程池中的线程，这样是不利于其他请求的处理的，当线程池中的线程处理任务时，任务由于长时间io操作，肯定会阻塞线程处理其他任务，引入异步servlet的目的就是将容器线程池和业务线程池分离开。在处理大io的业务操作的时候，把这个操作移动到业务线程池中进行，释放容器线程，使得容器线程处理其他任务，在业务逻辑执行完毕之后，然后在通知tomcat容器线程池来继续后面的操作，这个操作应该是把处理结果commit到客户端或者是dispatch到其他servlet上。</p> <a class="btn primary xsmall" href="/tomcat-async.html">more…</a>
+	</div>
+</div>	
+<div class='article'>
 	<h2>nginx request buf</h2>
 	<div class="well small">Permalink: <a class="more" href="/nginx-header-buf.html">2013-06-26 15:45:00</a>
 by <a class="url fn" href="/author/djjsindy.html">djjsindy </a>
  in <a href="/category/nginx.html">nginx</a>
 tags: <a href="/tag/nginx.html">nginx</a> </div>
 	<div class="summary"><p>nginx在接收到客户端得请求之后，就开始解析http请求，也就是解析http header，需要分配一段buf来接收这些数据，nginx并不知道这个http header的大小，在nginx配置中<code>client_header_buffer_size</code>和<code>large_client_header_buffers</code>这两个配置项起到了作用</p> <a class="btn primary xsmall" href="/nginx-header-buf.html">more…</a>
+	</div>
+</div>	
+<div class='article'>
+	<h2>nginx hash结构存储</h2>
+	<div class="well small">Permalink: <a class="more" href="/nginx-hash.html">2013-06-18 17:34:00</a>
+by <a class="url fn" href="/author/djjsindy.html">djjsindy </a>
+ in <a href="/category/nginx.html">nginx</a>
+tags: <a href="/tag/nginx.html">nginx</a> </div>
+	<div class="summary"><p>nginx在存储server_name和ngx_http_core_srv_conf_t的映射的时候用到了hash结构</p> <a class="btn primary xsmall" href="/nginx-hash.html">more…</a>
 	</div>
 </div>	
 

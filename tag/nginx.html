@@ -74,6 +74,15 @@ tags: <a href="/tag/nginx.html">nginx</a> </div>
 	<div class="summary"><p>nginx在接收到客户端得请求之后，就开始解析http请求，也就是解析http header，需要分配一段buf来接收这些数据，nginx并不知道这个http header的大小，在nginx配置中<code>client_header_buffer_size</code>和<code>large_client_header_buffers</code>这两个配置项起到了作用</p> <a class="btn primary xsmall" href="/nginx-header-buf.html">more…</a>
 	</div>
 </div>	
+<div class='article'>
+	<h2>nginx hash结构存储</h2>
+	<div class="well small">Permalink: <a class="more" href="/nginx-hash.html">2013-06-18 17:34:00</a>
+by <a class="url fn" href="/author/djjsindy.html">djjsindy </a>
+ in <a href="/category/nginx.html">nginx</a>
+tags: <a href="/tag/nginx.html">nginx</a> </div>
+	<div class="summary"><p>nginx在存储server_name和ngx_http_core_srv_conf_t的映射的时候用到了hash结构</p> <a class="btn primary xsmall" href="/nginx-hash.html">more…</a>
+	</div>
+</div>	
 
 
 		<footer>
