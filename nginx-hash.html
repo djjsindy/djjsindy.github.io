@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>djjsindy</title>
+	<meta name="description" content="">
+	<meta name="author" content="djjsindy">
+
+	<!-- HTML5 shim, for IE6-8 support of HTML elements -->
+	<!--[if lt IE 9]>
+		<script src="/theme/html5.js"></script>
+	<![endif]-->
+
+	<!-- Styles -->
+	<link href="/theme/bootstrap.min.css" rel="stylesheet">
+	<link href="/theme/local.css" rel="stylesheet">
+	<link href="/theme/pygments.css" rel="stylesheet">
+
+    <!-- Feeds -->
+        <link href="/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="djjsindy Atom Feed" />
+        
+	<script>var _gaq=[['_setAccount','UA-43260693-1'],['_trackPageview']];(function(d,t){var g=d.createElement(t),s=d.getElementsByTagName(t)[0];g.src='//www.google-analytics.com/ga.js';s.parentNode.insertBefore(g,s)}(document,'script'))</script>
+	</head>
+<body>
+			<div class="topbar">
+	  <div class="topbar-inner">
+		<div class="container-fluid">
+		  <a class="brand" href="/">djjsindy</a>
+			<ul class="nav">
+																										<li class="active"><a href="/category/nginx.html">nginx</a></li>
+									<li ><a href="/category/tomcat.html">tomcat</a></li>
+							</ul>
+			<p class="pull-right"><a href="/archives.html">[archives]</a> <a href="/tags.html">[tags]</a></p>
+		</div>
+	  </div>
+	</div>
+
+	<div class="container-fluid">
+	  <div class="sidebar">
+		<div class="well">
+			<h3>Blogroll</h3>
+			<ul>
+								<li><a href="http://getpelican.com/">Pelican</a></li>
+								<li><a href="http://python.org/">Python.org</a></li>
+								<li><a href="http://jinja.pocoo.org/">Jinja2</a></li>
+								<li><a href="#">You can modify those links in your config file</a></li>
+							</ul>
+			<div class="social">
+			<h3>Social</h3>
+			<ul>
+								<li><a href="#">You can add links in your config file</a></li>
+								<li><a href="#">Another social link</a></li>
+							</ul>
+			</div>
+		</div>
+	  </div>
+	  <div class="content">
+							<div class='article'>
+		<div class="page-header"><h1>nginx hash结构存储</h1></div>
+		<div class="well small">Permalink: <a class="more" href="/nginx-hash.html">2013-06-18 17:34:00</a>
+by <a class="url fn" href="/author/djjsindy.html">djjsindy </a>
+ in <a href="/category/nginx.html">nginx</a>
+tags: <a href="/tag/nginx.html">nginx</a> </div>
+		<div><p>nginx在存储server_name和<code>ngx_http_core_srv_conf_t</code>的映射的时候用到了hash结构，nginx中的非通配符server_name存储hash结构类似如下形式</p>
+<p><img alt="ALT" src="https://lh4.googleusercontent.com/-I6JcsqZXX9I/UhCBkJl_L9I/AAAAAAAAABE/GbXHXtRWWsA/s1024/Screen%2520Shot%25202013-06-18%2520at%25205.18.34%2520PM.png" /></p>
+<p>配置<code>server_names_hash_max_size</code>控制bucket的最大数量，<code>server_names_hash_bucket_size</code>控制每个bucket的大小，每个bucket可以盛放一定数量的<code>ngx_hash_elt_t</code>，每个bucket存放的<code>ngx_hash_elt_t</code>都拥有相同的hash％size。这里就要求拥有相同hash％size的元素全都放在一个bucket中，因为每个元素的hash值是确定的，size是不确定的。所以有必要从一定的size开始测试，看能不能保证拥有相同hash％size的元素放在同一个bucket中，如果不能，那么就继续加大size，因为加大size有利于元素分布的更分散一些。所以测试size的大小直到<code>server_names_hash_max_size</code>，如果到达了max size也不能使得相同的hash％size的元素同时分布在一个bucket中，那么就会报错了，提示<code>server_names_hash_max_size</code>和<code>server_names_hash_bucket_size</code>设置的不合理。</p>
+<p>每个bucket的布局如图</p>
+<p><img alt="ALT" src="https://lh5.googleusercontent.com/-7BGRzD0PfX8/UhCBnS-7E4I/AAAAAAAAABM/e1YfL00u0dk/s800/Screen%2520Shot%25202013-06-18%2520at%25205.21.25%2520PM.png" /></p>
+<p>看下代码的实现:</p>
+<p>构建hash的过程分为4步</p>
+<ol>
+<li>
+<p>第一步，检验bucket是否能存储每一个元素，如果设置的bucket_size过小，server_name又比较长，那么bucket是不能存下一个元素的。</p>
+<div class="highlight"><pre><span class="kt">ngx_int_t</span>
+<span class="nf">ngx_hash_init</span><span class="p">(</span><span class="kt">ngx_hash_init_t</span> <span class="o">*</span><span class="n">hinit</span><span class="p">,</span> <span class="kt">ngx_hash_key_t</span> <span class="o">*</span><span class="n">names</span><span class="p">,</span> <span class="kt">ngx_uint_t</span> <span class="n">nelts</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">u_char</span> <span class="o">*</span><span class="n">elts</span><span class="p">;</span> 
+    <span class="kt">size_t</span> <span class="n">len</span><span class="p">;</span> 
+    <span class="n">u_short</span> <span class="o">*</span><span class="n">test</span><span class="p">;</span> 
+    <span class="kt">ngx_uint_t</span> <span class="n">i</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">size</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">bucket_size</span><span class="p">;</span> 
+    <span class="kt">ngx_hash_elt_t</span> <span class="o">*</span><span class="n">elt</span><span class="p">,</span> <span class="o">**</span><span class="n">buckets</span><span class="p">;</span>
+
+    <span class="c1">//遍历每一个元素，看下bucket是否能存储下每一个元素,这里 NGX_HASH_ELT_SIZE是每一个元素的大小</span>
+    <span class="c1">//#define NGX_HASH_ELT_SIZE(name) </span>
+    <span class="c1">//(sizeof(void *) + ngx_align((name)-&gt;key.len + 2, sizeof(void *)))</span>
+    <span class="c1">//这里面每个name的value指向ngx_http_core_srv_conf_t，后面的key的大小就是key.len,再存储这个len，是个short类型，需要两个2字节的空间</span>
+
+    <span class="k">for</span> <span class="p">(</span><span class="n">n</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">n</span> <span class="o">&lt;</span> <span class="n">nelts</span><span class="p">;</span> <span class="n">n</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span> 
+        <span class="k">if</span> <span class="p">(</span><span class="n">hinit</span><span class="o">-&gt;</span><span class="n">bucket_size</span> <span class="o">&lt;</span> <span class="n">NGX_HASH_ELT_SIZE</span><span class="p">(</span><span class="o">&amp;</span><span class="n">names</span><span class="p">[</span><span class="n">n</span><span class="p">])</span> <span class="o">+</span> <span class="k">sizeof</span><span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">))</span> 
+        <span class="c1">//每个bucket的size 再加上sizeof(void *)的目的是每个bucket有个结束元素，这个元素的value是个指针，指向null。</span>
+        <span class="p">{</span>
+            <span class="n">ngx_log_error</span><span class="p">(</span><span class="n">NGX_LOG_EMERG</span><span class="p">,</span> <span class="n">hinit</span><span class="o">-&gt;</span><span class="n">pool</span><span class="o">-&gt;</span><span class="n">log</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span>
+                  <span class="s">&quot;could not build the %s, you should &quot;</span>
+                  <span class="s">&quot;increase %s_bucket_size: %i&quot;</span><span class="p">,</span> 
+                  <span class="n">hinit</span><span class="o">-&gt;</span><span class="n">name</span><span class="p">,</span> <span class="n">hinit</span><span class="o">-&gt;</span><span class="n">name</span><span class="p">,</span> <span class="n">hinit</span><span class="o">-&gt;</span><span class="n">bucket_size</span><span class="p">);</span>
+            <span class="k">return</span> <span class="n">NGX_ERROR</span><span class="p">;</span> 
+        <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+
+
+</li>
+<li>
+<p>第二步 要确定hash 的size，size尽可能的小，同时要保证具有相同hash％size的元素都再一个bucket中。</p>
+<div class="highlight"><pre><span class="c1">//test数组中存放每个bucket的当前容量，如果某一个key的容量大于了bucket size就意味着需要加大hash桶的个数了</span>
+<span class="n">test</span> <span class="o">=</span> <span class="n">ngx_alloc</span><span class="p">(</span><span class="n">hinit</span><span class="o">-&gt;</span><span class="n">max_size</span> <span class="o">*</span> <span class="n">sizeof</span><span class="p">(</span><span class="n">u_short</span><span class="p">),</span> <span class="n">hinit</span><span class="o">-&gt;</span><span class="n">pool</span><span class="o">-&gt;</span><span class="n">log</span><span class="p">);</span>
+<span class="k">if</span> <span class="p">(</span><span class="n">test</span> <span class="o">==</span> <span class="no">NULL</span><span class="p">)</span> <span class="p">{</span> 
+<span class="k">return</span> <span class="no">NGX_ERROR</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">//每个bucket的size需要去掉最后一个元素所占的空间，这个元素是个哑元素，用来判断当前bucket是否还有元素</span>
+<span class="n">bucket_size</span> <span class="o">=</span> <span class="n">hinit</span><span class="o">-&gt;</span><span class="n">bucket_size</span> <span class="o">-</span> <span class="n">sizeof</span><span class="p">(</span><span class="k">void</span> <span class="o">*</span><span class="p">);</span>
+<span class="c1">//start是最少的bucket的数目，因为每个元素占有的空间是value的指针和后面len和name按照字节对齐的总和</span>
+<span class="n">start</span> <span class="o">=</span> <span class="n">nelts</span> <span class="o">/</span> <span class="p">(</span><span class="n">bucket_size</span> <span class="o">/</span> <span class="p">(</span><span class="mh">2</span> <span class="o">*</span> <span class="n">sizeof</span><span class="p">(</span><span class="k">void</span> <span class="o">*</span><span class="p">)));</span>
+<span class="n">start</span> <span class="o">=</span> <span class="n">start</span> <span class="o">?</span> <span class="n">start</span> <span class="o">:</span> <span class="mh">1</span><span class="p">;</span>
+<span class="c1">//经验值</span>
+<span class="k">if</span> <span class="p">(</span><span class="n">hinit</span><span class="o">-&gt;</span><span class="n">max_size</span> <span class="o">&gt;</span> <span class="mh">10000</span> <span class="o">&amp;&amp;</span> <span class="n">nelts</span> <span class="o">&amp;&amp;</span> <span class="n">hinit</span><span class="o">-&gt;</span><span class="n">max_size</span> <span class="o">/</span> <span class="n">nelts</span> <span class="o">&lt;</span> <span class="mh">100</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">start</span> <span class="o">=</span> <span class="n">hinit</span><span class="o">-&gt;</span><span class="n">max_size</span> <span class="o">-</span> <span class="mh">1000</span><span class="p">;</span>
+<span class="p">}</span> 
+<span class="c1">//size从start开始，逐渐加大bucket的个数，直到恰好满足所有具有相同hash％size的元素都在同一个bucket，这样hash的size就能确定了</span>
+<span class="k">for</span> <span class="p">(</span><span class="n">size</span> <span class="o">=</span> <span class="n">start</span><span class="p">;</span> <span class="n">size</span> <span class="o">&lt;</span> <span class="n">hinit</span><span class="o">-&gt;</span><span class="n">max_size</span><span class="p">;</span> <span class="n">size</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+<span class="c1">//每次递归新的size的时候需要将旧test的数据清空</span>
+    <span class="n">ngx_memzero</span><span class="p">(</span><span class="n">test</span><span class="p">,</span> <span class="n">size</span> <span class="o">*</span> <span class="n">sizeof</span><span class="p">(</span><span class="n">u_short</span><span class="p">));</span>
+ <span class="c1">//新size的开始，遍历每一个元素</span>
+    <span class="k">for</span> <span class="p">(</span><span class="n">n</span> <span class="o">=</span> <span class="mh">0</span><span class="p">;</span> <span class="n">n</span> <span class="o">&lt;</span> <span class="n">nelts</span><span class="p">;</span> <span class="n">n</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span> 
+        <span class="k">if</span> <span class="p">(</span><span class="n">names</span><span class="p">[</span><span class="n">n</span><span class="p">].</span><span class="n">key</span><span class="p">.</span><span class="n">data</span> <span class="o">==</span> <span class="no">NULL</span><span class="p">)</span> <span class="p">{</span>
+            <span class="k">continue</span><span class="p">;</span> 
+        <span class="p">}</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="n">names</span><span class="p">[</span><span class="n">n</span><span class="p">].</span><span class="n">key_hash</span> <span class="o">%</span> <span class="n">size</span><span class="p">;</span>
+        <span class="c1">//开始叠加每个bucket的size</span>
+        <span class="n">test</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">u_short</span><span class="p">)</span> <span class="p">(</span><span class="n">test</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">+</span> <span class="no">NGX_HASH_ELT_SIZE</span><span class="p">(</span><span class="o">&amp;</span><span class="n">names</span><span class="p">[</span><span class="n">n</span><span class="p">]));</span>
+        <span class="c1">//如果某个bucket的size超过了bucket_size，那么加大bucket的个数，使得元素分布更分散一些</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">test</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">&gt;</span> <span class="p">(</span><span class="n">u_short</span><span class="p">)</span> <span class="n">bucket_size</span><span class="p">)</span> <span class="p">{</span>
+            <span class="n">goto</span> <span class="n">next</span><span class="p">;</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+<span class="n">goto</span> <span class="n">found</span><span class="p">;</span>
+
+<span class="nl">next:</span>
+
+<span class="k">continue</span><span class="p">;</span>
+<span class="p">}</span>
+ <span class="c1">//最终如果size超过了max size，就报错</span>
+<span class="n">ngx_log_error</span><span class="p">(</span><span class="no">NGX_LOG_EMERG</span><span class="p">,</span> <span class="n">hinit</span><span class="o">-&gt;</span><span class="n">pool</span><span class="o">-&gt;</span><span class="n">log</span><span class="p">,</span> <span class="mh">0</span><span class="p">,</span>
+          <span class="s">&quot;could not build the %s, you should increase &quot;</span>
+          <span class="s">&quot;either %s_max_size: %i or %s_bucket_size: %i&quot;</span><span class="p">,</span>
+          <span class="n">hinit</span><span class="o">-&gt;</span><span class="n">name</span><span class="p">,</span> <span class="n">hinit</span><span class="o">-&gt;</span><span class="n">name</span><span class="p">,</span> <span class="n">hinit</span><span class="o">-&gt;</span><span class="n">max_size</span><span class="p">,</span>
+          <span class="n">hinit</span><span class="o">-&gt;</span><span class="n">name</span><span class="p">,</span> <span class="n">hinit</span><span class="o">-&gt;</span><span class="n">bucket_size</span><span class="p">);</span>
+
+<span class="n">ngx_free</span><span class="p">(</span><span class="n">test</span><span class="p">);</span>
+
+<span class="k">return</span> <span class="no">NGX_ERROR</span><span class="p">;</span>
+</pre></div>
+
+
+</li>
+<li>
+<p>第三步：表示找到了合适的bucket个数，使得所有具有相同的hash％size的元素都在同一个bucket中，需要根据元素具体数量，分配地址空间</p>
+<div class="highlight"><pre><span class="nl">found:</span>
+<span class="c1">//每个bucket都有一个哑元素</span>
+<span class="k">for</span> <span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">size</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">test</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="k">sizeof</span><span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">);</span>
+<span class="p">}</span>
+<span class="c1">//遍历每个bucket计算每个bucket的大小</span>
+<span class="k">for</span> <span class="p">(</span><span class="n">n</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">n</span> <span class="o">&lt;</span> <span class="n">nelts</span><span class="p">;</span> <span class="n">n</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">names</span><span class="p">[</span><span class="n">n</span><span class="p">].</span><span class="n">key</span><span class="p">.</span><span class="n">data</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">continue</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">key</span> <span class="o">=</span> <span class="n">names</span><span class="p">[</span><span class="n">n</span><span class="p">].</span><span class="n">key_hash</span> <span class="o">%</span> <span class="n">size</span><span class="p">;</span>
+    <span class="n">test</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">u_short</span><span class="p">)</span> <span class="p">(</span><span class="n">test</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">+</span> <span class="n">NGX_HASH_ELT_SIZE</span><span class="p">(</span><span class="o">&amp;</span><span class="n">names</span><span class="p">[</span><span class="n">n</span><span class="p">]));</span>
+<span class="p">}</span>
+
+<span class="n">len</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+<span class="c1">//叠加每个bucket 的大小，sum是len</span>
+<span class="k">for</span> <span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">size</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">test</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">==</span> <span class="k">sizeof</span><span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">))</span> <span class="p">{</span>
+        <span class="k">continue</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">test</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">u_short</span><span class="p">)</span> <span class="p">(</span><span class="n">ngx_align</span><span class="p">(</span><span class="n">test</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">ngx_cacheline_size</span><span class="p">));</span>
+
+    <span class="n">len</span> <span class="o">+=</span> <span class="n">test</span><span class="p">[</span><span class="n">i</span><span class="p">];</span>
+<span class="p">}</span>
+<span class="c1">//初始化hinit的hash结构空间</span>
+<span class="k">if</span> <span class="p">(</span><span class="n">hinit</span><span class="o">-&gt;</span><span class="n">hash</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">hinit</span><span class="o">-&gt;</span><span class="n">hash</span> <span class="o">=</span> <span class="n">ngx_pcalloc</span><span class="p">(</span><span class="n">hinit</span><span class="o">-&gt;</span><span class="n">pool</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="kt">ngx_hash_wildcard_t</span><span class="p">)</span>
+                                     <span class="o">+</span> <span class="n">size</span> <span class="o">*</span> <span class="k">sizeof</span><span class="p">(</span><span class="kt">ngx_hash_elt_t</span> <span class="o">*</span><span class="p">));</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">hinit</span><span class="o">-&gt;</span><span class="n">hash</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">ngx_free</span><span class="p">(</span><span class="n">test</span><span class="p">);</span>
+        <span class="k">return</span> <span class="n">NGX_ERROR</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">buckets</span> <span class="o">=</span> <span class="p">(</span><span class="kt">ngx_hash_elt_t</span> <span class="o">**</span><span class="p">)</span>
+              <span class="p">((</span><span class="n">u_char</span> <span class="o">*</span><span class="p">)</span> <span class="n">hinit</span><span class="o">-&gt;</span><span class="n">hash</span> <span class="o">+</span> <span class="k">sizeof</span><span class="p">(</span><span class="kt">ngx_hash_wildcard_t</span><span class="p">));</span>
+
+<span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+    <span class="n">buckets</span> <span class="o">=</span> <span class="n">ngx_pcalloc</span><span class="p">(</span><span class="n">hinit</span><span class="o">-&gt;</span><span class="n">pool</span><span class="p">,</span> <span class="n">size</span> <span class="o">*</span> <span class="k">sizeof</span><span class="p">(</span><span class="kt">ngx_hash_elt_t</span> <span class="o">*</span><span class="p">));</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">buckets</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">ngx_free</span><span class="p">(</span><span class="n">test</span><span class="p">);</span>
+        <span class="k">return</span> <span class="n">NGX_ERROR</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+<span class="c1">//malloc bucket的空间，根据那个上面计算出来的len</span>
+<span class="n">elts</span> <span class="o">=</span> <span class="n">ngx_palloc</span><span class="p">(</span><span class="n">hinit</span><span class="o">-&gt;</span><span class="n">pool</span><span class="p">,</span> <span class="n">len</span> <span class="o">+</span> <span class="n">ngx_cacheline_size</span><span class="p">);</span>
+<span class="k">if</span> <span class="p">(</span><span class="n">elts</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">ngx_free</span><span class="p">(</span><span class="n">test</span><span class="p">);</span>
+    <span class="k">return</span> <span class="n">NGX_ERROR</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">elts</span> <span class="o">=</span> <span class="n">ngx_align_ptr</span><span class="p">(</span><span class="n">elts</span><span class="p">,</span> <span class="n">ngx_cacheline_size</span><span class="p">);</span>
+<span class="c1">//把elts地址空间分发到每个bucket中</span>
+<span class="k">for</span> <span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">size</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">test</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">==</span> <span class="k">sizeof</span><span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="p">))</span> <span class="p">{</span>
+        <span class="k">continue</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">buckets</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="kt">ngx_hash_elt_t</span> <span class="o">*</span><span class="p">)</span> <span class="n">elts</span><span class="p">;</span>
+    <span class="n">elts</span> <span class="o">+=</span> <span class="n">test</span><span class="p">[</span><span class="n">i</span><span class="p">];</span>
+
+<span class="p">}</span>
+</pre></div>
+
+
+</li>
+<li>
+<p>第四步，hash结构已经有了，开始填充数据，填充每一个bucket</p>
+<div class="highlight"><pre><span class="k">for</span> <span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">size</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">test</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">for</span> <span class="p">(</span><span class="n">n</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">n</span> <span class="o">&lt;</span> <span class="n">nelts</span><span class="p">;</span> <span class="n">n</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">names</span><span class="p">[</span><span class="n">n</span><span class="p">].</span><span class="n">key</span><span class="p">.</span><span class="n">data</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">continue</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="c1">//这里test数组纪录每个bucket当前组后一个元素的位移，为了计算下一个元素的位置</span>
+    <span class="n">key</span> <span class="o">=</span> <span class="n">names</span><span class="p">[</span><span class="n">n</span><span class="p">].</span><span class="n">key_hash</span> <span class="o">%</span> <span class="n">size</span><span class="p">;</span>
+    <span class="n">elt</span> <span class="o">=</span> <span class="p">(</span><span class="kt">ngx_hash_elt_t</span> <span class="o">*</span><span class="p">)</span> <span class="p">((</span><span class="n">u_char</span> <span class="o">*</span><span class="p">)</span> <span class="n">buckets</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">+</span> <span class="n">test</span><span class="p">[</span><span class="n">key</span><span class="p">]);</span>
+
+    <span class="n">elt</span><span class="o">-&gt;</span><span class="n">value</span> <span class="o">=</span> <span class="n">names</span><span class="p">[</span><span class="n">n</span><span class="p">].</span><span class="n">value</span><span class="p">;</span>
+    <span class="n">elt</span><span class="o">-&gt;</span><span class="n">len</span> <span class="o">=</span> <span class="p">(</span><span class="n">u_short</span><span class="p">)</span> <span class="n">names</span><span class="p">[</span><span class="n">n</span><span class="p">].</span><span class="n">key</span><span class="p">.</span><span class="n">len</span><span class="p">;</span>
+
+    <span class="n">ngx_strlow</span><span class="p">(</span><span class="n">elt</span><span class="o">-&gt;</span><span class="n">name</span><span class="p">,</span> <span class="n">names</span><span class="p">[</span><span class="n">n</span><span class="p">].</span><span class="n">key</span><span class="p">.</span><span class="n">data</span><span class="p">,</span> <span class="n">names</span><span class="p">[</span><span class="n">n</span><span class="p">].</span><span class="n">key</span><span class="p">.</span><span class="n">len</span><span class="p">);</span>
+    <span class="c1">//更新bucket中下一个元素的位置</span>
+    <span class="n">test</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">u_short</span><span class="p">)</span> <span class="p">(</span><span class="n">test</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">+</span> <span class="n">NGX_HASH_ELT_SIZE</span><span class="p">(</span><span class="o">&amp;</span><span class="n">names</span><span class="p">[</span><span class="n">n</span><span class="p">]));</span>
+<span class="p">}</span>
+<span class="c1">//最后填充结束节点</span>
+<span class="k">for</span> <span class="p">(</span><span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">size</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">buckets</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">continue</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="c1">//强转不会出现问题，虽然只有一个指针的空间</span>
+    <span class="n">elt</span> <span class="o">=</span> <span class="p">(</span><span class="kt">ngx_hash_elt_t</span> <span class="o">*</span><span class="p">)</span> <span class="p">((</span><span class="n">u_char</span> <span class="o">*</span><span class="p">)</span> <span class="n">buckets</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+</span> <span class="n">test</span><span class="p">[</span><span class="n">i</span><span class="p">]);</span>
+
+    <span class="n">elt</span><span class="o">-&gt;</span><span class="n">value</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">ngx_free</span><span class="p">(</span><span class="n">test</span><span class="p">);</span>
+
+<span class="n">hinit</span><span class="o">-&gt;</span><span class="n">hash</span><span class="o">-&gt;</span><span class="n">buckets</span> <span class="o">=</span> <span class="n">buckets</span><span class="p">;</span>
+<span class="n">hinit</span><span class="o">-&gt;</span><span class="n">hash</span><span class="o">-&gt;</span><span class="n">size</span> <span class="o">=</span> <span class="n">size</span><span class="p">;</span>
+</pre></div>
+
+
+</li>
+</ol>
+<blockquote>
+<p>总结</p>
+<p>nginx的hash结构是静态的，也就是不需要插入删除元素，这里选择合适的bucket个数是这个init过程的关键，要保证bucket个数最小，同时要保证具有相同hash％size的元素都能存放在一个bucket当中。</p>
+</blockquote></div>
+		<div>
+			<h2>Comments</h2>
+		 									<div>
+	</div>	
+		<footer>
+		  <p>Powered by <a href="http://getpelican.com/">Pelican</a>. Theme based on <a href="http://twitter.github.com/bootstrap/">Twitter Bootstrap</a>.</p>
+		  <p>&copy; djjsindy</p>
+		</footer>
+	  </div>
+
+	</div>
+</body>
+</html>
