@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>djjsindy</title>
+	<meta name="description" content="">
+	<meta name="author" content="djjsindy">
+
+	<!-- HTML5 shim, for IE6-8 support of HTML elements -->
+	<!--[if lt IE 9]>
+		<script src="/theme/html5.js"></script>
+	<![endif]-->
+
+	<!-- Styles -->
+	<link href="/theme/bootstrap.min.css" rel="stylesheet">
+	<link href="/theme/local.css" rel="stylesheet">
+	<link href="/theme/pygments.css" rel="stylesheet">
+
+    <!-- Feeds -->
+        <link href="/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="djjsindy Atom Feed" />
+        
+	<script>var _gaq=[['_setAccount','UA-43260693-1'],['_trackPageview']];(function(d,t){var g=d.createElement(t),s=d.getElementsByTagName(t)[0];g.src='//www.google-analytics.com/ga.js';s.parentNode.insertBefore(g,s)}(document,'script'))</script>
+	</head>
+<body>
+			<div class="topbar">
+	  <div class="topbar-inner">
+		<div class="container-fluid">
+		  <a class="brand" href="/">djjsindy</a>
+			<ul class="nav">
+																										<li class="active"><a href="/category/nginx.html">nginx</a></li>
+									<li ><a href="/category/tomcat.html">tomcat</a></li>
+							</ul>
+			<p class="pull-right"><a href="/archives.html">[archives]</a> <a href="/tags.html">[tags]</a></p>
+		</div>
+	  </div>
+	</div>
+
+	<div class="container-fluid">
+	  <div class="sidebar">
+		<div class="well">
+			<h3>Blogroll</h3>
+			<ul>
+								<li><a href="djjsindy.blog.chinaunix.net">djjsindy-chinaunix</a></li>
+								<li><a href="http://nginx.org/">nginx</a></li>
+							</ul>
+			<div class="social">
+			<h3>Social</h3>
+			<ul>
+							</ul>
+			</div>
+		</div>
+	  </div>
+	  <div class="content">
+							<div class='article'>
+		<div class="page-header"><h1>nginx static location tree</h1></div>
+		<div class="well small">Permalink: <a class="more" href="/nginx-static-location-tree.html">2013-06-07 23:56:00</a>
+by <a class="url fn" href="/author/djjsindy.html">djjsindy </a>
+ in <a href="/category/nginx.html">nginx</a>
+tags: <a href="/tag/nginx.html">nginx</a> </div>
+		<div><p>nginx在处理location的配置的时候，用到了一种三叉排序树，加速了通过request的url和location的映射速度。</p>
+<p><img alt="Alt" src="https://lh4.googleusercontent.com/-ImJc2DVKOG4/UhxB0gMpFwI/AAAAAAAAALY/EJejCGD4uh8/s1024/Screen%2520Shot%25202013-06-07%2520at%252011.32.58%2520PM.png" /></p>
+<p>可以从图中看到，static location tree的结构中，left指向的node是比parent的节点小的，right指向的node是比parent节点大的，tree指向拥有parent前缀的节点。初始的static location的类型包括extact_match，前缀匹配。看一下nginx是如何uri和location之间快速做映射的。</p>
+<div class="highlight"><pre><span class="k">static</span> <span class="kt">ngx_int_t</span>
+<span class="nf">ngx_http_core_find_static_location</span><span class="p">(</span><span class="kt">ngx_http_request_t</span> <span class="o">*</span><span class="n">r</span><span class="p">,</span>
+<span class="kt">ngx_http_location_tree_node_t</span> <span class="o">*</span><span class="n">node</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="n">u_char</span> <span class="o">*</span><span class="n">uri</span><span class="p">;</span>
+<span class="kt">size_t</span> <span class="n">len</span><span class="p">,</span> <span class="n">n</span><span class="p">;</span>
+<span class="kt">ngx_int_t</span> <span class="n">rc</span><span class="p">,</span> <span class="n">rv</span><span class="p">;</span>
+
+<span class="n">len</span> <span class="o">=</span> <span class="n">r</span><span class="o">-&gt;</span><span class="n">uri</span><span class="p">.</span><span class="n">len</span><span class="p">;</span>  <span class="c1">//request的请求路径长度</span>
+<span class="n">uri</span> <span class="o">=</span> <span class="n">r</span><span class="o">-&gt;</span><span class="n">uri</span><span class="p">.</span><span class="n">data</span><span class="p">;</span> <span class="c1">//request请求的地址</span>
+
+<span class="n">rv</span> <span class="o">=</span> <span class="n">NGX_DECLINED</span><span class="p">;</span> <span class="c1">//默认精准匹配和前缀匹配 匹配不到，需要匹配后面的正则</span>
+
+<span class="k">for</span> <span class="p">(</span> <span class="p">;;</span> <span class="p">)</span> <span class="p">{</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">node</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">rv</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">ngx_log_debug2</span><span class="p">(</span><span class="n">NGX_LOG_DEBUG_HTTP</span><span class="p">,</span> <span class="n">r</span><span class="o">-&gt;</span><span class="n">connection</span><span class="o">-&gt;</span><span class="n">log</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span>
+                   <span class="s">&quot;test location: &quot;</span><span class="o">%*</span><span class="n">s</span><span class="s">&quot;&quot;</span><span class="p">,</span> <span class="n">node</span><span class="o">-&gt;</span><span class="n">len</span><span class="p">,</span> <span class="n">node</span><span class="o">-&gt;</span><span class="n">name</span><span class="p">);</span>
+    <span class="c1">//n是uri的长度和node name长度的最小值，好比较他们的交集</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="p">(</span><span class="n">len</span> <span class="o">&lt;=</span> <span class="p">(</span><span class="kt">size_t</span><span class="p">)</span> <span class="n">node</span><span class="o">-&gt;</span><span class="n">len</span><span class="p">)</span> <span class="o">?</span> <span class="n">len</span> <span class="o">:</span> <span class="n">node</span><span class="o">-&gt;</span><span class="n">len</span><span class="p">;</span> 
+    <span class="c1">//比较uri和node 的name交集</span>
+    <span class="n">rc</span> <span class="o">=</span> <span class="n">ngx_filename_cmp</span><span class="p">(</span><span class="n">uri</span><span class="p">,</span> <span class="n">node</span><span class="o">-&gt;</span><span class="n">name</span><span class="p">,</span> <span class="n">n</span><span class="p">);</span> 
+    <span class="c1">//不得0表示uri和node的name不相等，这时候三叉树就能加速查找的效率，选择node的左节点或者右节点</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">rc</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>     
+        <span class="n">node</span> <span class="o">=</span> <span class="p">(</span><span class="n">rc</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span> <span class="o">?</span> <span class="n">node</span><span class="o">-&gt;</span><span class="n">left</span> <span class="o">:</span> <span class="n">node</span><span class="o">-&gt;</span><span class="n">right</span><span class="p">;</span>
+
+        <span class="k">continue</span><span class="p">;</span> <span class="c1">//更新节点后重新开始比较匹配</span>
+    <span class="p">}</span>
+     <span class="c1">//如果交集相等，如果uri的长度比node的长度还要长</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">len</span> <span class="o">&gt;</span> <span class="p">(</span><span class="kt">size_t</span><span class="p">)</span> <span class="n">node</span><span class="o">-&gt;</span><span class="n">len</span><span class="p">)</span> <span class="p">{</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">node</span><span class="o">-&gt;</span><span class="n">inclusive</span><span class="p">)</span> <span class="p">{</span><span class="c1">//如果这个节点是前缀匹配的那种需要递归tree节点，因为tree节点后面的子节点拥有相同的前缀。</span>
+    <span class="c1">//因为前缀已经匹配到了，所以这里先暂且把loc_conf作为target，但是不保证后面的tree节点的子节点是否有和uri完全匹配或者更多前缀匹配的。例如如果uri是/abc,当前node节点是/a,虽然匹配到了location /a,先把/a的location配置作为target，但是有可能在/a的tree节点有/abc的location，所以需要递归tree节点看一下。</span>
+
+            <span class="n">r</span><span class="o">-&gt;</span><span class="n">loc_conf</span> <span class="o">=</span> <span class="n">node</span><span class="o">-&gt;</span><span class="n">inclusive</span><span class="o">-&gt;</span><span class="n">loc_conf</span><span class="p">;</span> 
+    <span class="c1">//设置成again表示需要递归嵌套location，为什么要嵌套递归呢，因为location的嵌套配置虽然官方不推荐，但是配置的话，父子location需要有相同的前缀。所以需要递归嵌套location</span>
+            <span class="n">rv</span> <span class="o">=</span> <span class="n">NGX_AGAIN</span><span class="p">;</span>
+
+            <span class="n">node</span> <span class="o">=</span> <span class="n">node</span><span class="o">-&gt;</span><span class="n">tree</span><span class="p">;</span> <span class="c1">//node重新变为tree节点</span>
+            <span class="n">uri</span> <span class="o">+=</span> <span class="n">n</span><span class="p">;</span>
+            <span class="n">len</span> <span class="o">-=</span> <span class="n">n</span><span class="p">;</span>
+   <span class="k">continue</span><span class="p">;</span>
+        <span class="p">}</span>
+
+        <span class="cm">/* exact only */</span>
+    <span class="c1">//对于精确匹配的location不会放在公共前缀节点的tree节点中，会单拉出来一个node和前缀节点平行。也就是说对于精确匹配 ＝/abcd 和前缀匹配的/abc两个location配置，=/abcd不会是/abc节点的tree节点。=/abcd 只能是／abc的right节点</span>
+        <span class="n">node</span> <span class="o">=</span> <span class="n">node</span><span class="o">-&gt;</span><span class="n">right</span><span class="p">;</span>
+
+        <span class="k">continue</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">len</span> <span class="o">==</span> <span class="p">(</span><span class="kt">size_t</span><span class="p">)</span> <span class="n">node</span><span class="o">-&gt;</span><span class="n">len</span><span class="p">)</span> <span class="p">{</span> <span class="c1">//如果是uri和node的name是完全相等的</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">node</span><span class="o">-&gt;</span><span class="n">exact</span><span class="p">)</span> <span class="p">{</span>           <span class="c1">//如果是精确匹配，那么就是直接返回ok了</span>
+            <span class="n">r</span><span class="o">-&gt;</span><span class="n">loc_conf</span> <span class="o">=</span> <span class="n">node</span><span class="o">-&gt;</span><span class="n">exact</span><span class="o">-&gt;</span><span class="n">loc_conf</span><span class="p">;</span>
+            <span class="k">return</span> <span class="n">NGX_OK</span><span class="p">;</span>
+
+        <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>                 <span class="c1">//如果还是前缀模式的location，那么需要递归嵌套location了，需要提前设置loc_conf，如果嵌套有匹配的再覆盖</span>
+            <span class="n">r</span><span class="o">-&gt;</span><span class="n">loc_conf</span> <span class="o">=</span> <span class="n">node</span><span class="o">-&gt;</span><span class="n">inclusive</span><span class="o">-&gt;</span><span class="n">loc_conf</span><span class="p">;</span>
+            <span class="k">return</span> <span class="n">NGX_AGAIN</span><span class="p">;</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="cm">/* len &lt; node-&gt;len */</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">len</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">==</span> <span class="p">(</span><span class="kt">size_t</span><span class="p">)</span> <span class="n">node</span><span class="o">-&gt;</span><span class="n">len</span> <span class="o">&amp;&amp;</span> <span class="n">node</span><span class="o">-&gt;</span><span class="n">auto_redirect</span><span class="p">)</span> <span class="p">{</span>
+
+        <span class="n">r</span><span class="o">-&gt;</span><span class="n">loc_conf</span> <span class="o">=</span> <span class="p">(</span><span class="n">node</span><span class="o">-&gt;</span><span class="n">exact</span><span class="p">)</span> <span class="o">?</span> <span class="n">node</span><span class="o">-&gt;</span><span class="n">exact</span><span class="o">-&gt;</span><span class="n">loc_conf</span><span class="o">:</span>
+                                      <span class="n">node</span><span class="o">-&gt;</span><span class="n">inclusive</span><span class="o">-&gt;</span><span class="n">loc_conf</span><span class="p">;</span>
+        <span class="n">rv</span> <span class="o">=</span> <span class="n">NGX_DONE</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="c1">//如果前缀相等，uri的长度比node的长度还要小，比如node的name是/abc ，uri是/ab,这种情况是/abc 一定是精确匹配，因为如果是前缀匹配那么／abc 肯定会再／ab的tree 指针里面。</span>
+    <span class="n">node</span> <span class="o">=</span> <span class="n">node</span><span class="o">-&gt;</span><span class="n">left</span><span class="p">;</span> 
+<span class="p">}</span>
+</pre></div>
+
+
+<p>可以从上面的代码看出，三叉树优化了static location的查找过程，防止了O(n)的复杂度来匹配location。location tree的建立过程比较复杂，首先在解析完所有location后，<code>ngx_http_core_loc_conf_t</code>的locations保存了所有的location配置，形成了一个链表，在merge完server和main的配置之后，就开始建立这个static location tree了。</p>
+<p>首先从locations链表中去掉那些正则匹配，还有named和nonamed的location节点。那么location链表中只剩下精准匹配和前缀匹配的那些location节点了，从这些节点中产生static location tree。</p>
+<p>生成location tree的必经一步是生成location list，也是一种前缀list，大概的产生步骤是这样，从第一个location节点开始，找到一个与第一个location节点前缀不相同的节点，然后把这个节点之前的list到location，全部作为第一个location的location list，然后递归这个location list，同时继续递归后面剩下的location，说下上图中原始location 的分布。</p>
+<p><img alt="alt" src="https://lh3.googleusercontent.com/-QFJd7ugmHs4/UhxB0hOMgTI/AAAAAAAAALY/xfI4pPpKChM/s1024/Screen%2520Shot%25202013-06-07%2520at%252011.40.29%2520PM.png" /></p>
+<p>从a1开始寻找和a1前缀相同的location，表示没有，所以a1就没有前缀list，继续aa节点，从aa节点到aad节点都是以aa为前缀的，所以location变为了下图。</p>
+<p><img alt="alt" src="https://lh5.googleusercontent.com/-VWl-Bg0Cfrg/UhxB0oByBEI/AAAAAAAAALY/UGg7PKjd59E/s1048/Screen%2520Shot%25202013-06-07%2520at%252011.41.26%2520PM.png" /></p>
+<p>然后递归分离的aa节点的list ，aac和aad节点，看aac的节点的后继节点有没有是aac前缀的。然后主location继续递归ab节点的后继节点。最后形成如下的location list。</p>
+<p><img alt="alt" src="https://lh3.googleusercontent.com/-KU2hvc_C-ok/UhxB1W1t1bI/AAAAAAAAALY/epVtU9fIDUA/s986/Screen%2520Shot%25202013-06-07%2520at%252011.43.07%2520PM.png" /></p>
+<p>最终location list的节点分布如上图，list指针的链表后面的元素都是拥有相同前缀的。</p>
+<p>再说下构建list元素的时候经常用到的一个函数：<code>ngx_queue_split(locations, q, &amp;tail)</code>,作用是把location切割成两个双向循环队列，location队列和tail队列，location队列从原始的头元素到q元素之前的元素，tail队列从q元素开始到原location队列的最后一个元素。split操作节点示意图如下：</p>
+<p><img alt="alt" src="https://lh5.googleusercontent.com/-sOXSwTyhyuU/UhxB2fFTsKI/AAAAAAAAALY/x__n3521DlE/s1024/Screen%2520Shot%25202013-06-07%2520at%252011.44.08%2520PM.png" /></p>
+<p>看下location list 的建立过程</p>
+<div class="highlight"><pre><span class="k">static</span> <span class="kt">void</span> 
+<span class="nf">ngx_http_create_locations_list</span><span class="p">(</span><span class="kt">ngx_queue_t</span> <span class="o">*</span><span class="n">locations</span><span class="p">,</span> <span class="kt">ngx_queue_t</span> <span class="o">*</span><span class="n">q</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="n">u_char</span> <span class="o">*</span><span class="n">name</span><span class="p">;</span>
+<span class="kt">size_t</span> <span class="n">len</span><span class="p">;</span> 
+<span class="kt">ngx_queue_t</span> <span class="o">*</span><span class="n">x</span><span class="p">,</span> <span class="n">tail</span><span class="p">;</span>
+<span class="kt">ngx_http_location_queue_t</span> <span class="o">*</span><span class="n">lq</span><span class="p">,</span> <span class="o">*</span><span class="n">lx</span><span class="p">;</span>
+
+<span class="k">if</span> <span class="p">(</span><span class="n">q</span> <span class="o">==</span> <span class="n">ngx_queue_last</span><span class="p">(</span><span class="n">locations</span><span class="p">))</span> <span class="p">{</span> <span class="c1">//如果location为空就没有必要继续走下面的流程了，尤其是递归到嵌套location</span>
+    <span class="k">return</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">lq</span> <span class="o">=</span> <span class="p">(</span><span class="kt">ngx_http_location_queue_t</span> <span class="o">*</span><span class="p">)</span> <span class="n">q</span><span class="p">;</span>
+
+<span class="k">if</span> <span class="p">(</span><span class="n">lq</span><span class="o">-&gt;</span><span class="n">inclusive</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span> 
+    <span class="n">ngx_http_create_locations_list</span><span class="p">(</span><span class="n">locations</span><span class="p">,</span> <span class="n">ngx_queue_next</span><span class="p">(</span><span class="n">q</span><span class="p">));</span> <span class="c1">//如果这个节点是精准匹配那么这个节点，就不会作为某些节点的前缀，不用拥有tree节点</span>
+    <span class="k">return</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">len</span> <span class="o">=</span> <span class="n">lq</span><span class="o">-&gt;</span><span class="n">name</span><span class="o">-&gt;</span><span class="n">len</span><span class="p">;</span> 
+<span class="n">name</span> <span class="o">=</span> <span class="n">lq</span><span class="o">-&gt;</span><span class="n">name</span><span class="o">-&gt;</span><span class="n">data</span><span class="p">;</span>
+
+<span class="k">for</span> <span class="p">(</span><span class="n">x</span> <span class="o">=</span> <span class="n">ngx_queue_next</span><span class="p">(</span><span class="n">q</span><span class="p">);</span>
+     <span class="n">x</span> <span class="o">!=</span> <span class="n">ngx_queue_sentinel</span><span class="p">(</span><span class="n">locations</span><span class="p">);</span>
+     <span class="n">x</span> <span class="o">=</span> <span class="n">ngx_queue_next</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+<span class="p">{</span> 
+    <span class="n">lx</span> <span class="o">=</span> <span class="p">(</span><span class="kt">ngx_http_location_queue_t</span> <span class="o">*</span><span class="p">)</span> <span class="n">x</span><span class="p">;</span>
+     <span class="c1">//由于所有location已经按照顺序排列好，递归q节点的后继节点，如果后继节点的长度小于后缀节点的长度，那么可以断定，这个后继节点肯定和后缀节点不一样，并且不可能有共同的后缀；如果后继节点和q节点的交集做比较，如果不同，就表示不是同一个前缀，所以可以看出，从q节点的location list应该是从q.next到x.prev节点</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">len</span> <span class="o">&gt;</span> <span class="n">lx</span><span class="o">-&gt;</span><span class="n">name</span><span class="o">-&gt;</span><span class="n">len</span> 
+        <span class="o">||</span> <span class="p">(</span><span class="n">ngx_strncmp</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">lx</span><span class="o">-&gt;</span><span class="n">name</span><span class="o">-&gt;</span><span class="n">data</span><span class="p">,</span> <span class="n">len</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">))</span>
+    <span class="p">{</span> 
+        <span class="k">break</span><span class="p">;</span>
+    <span class="p">}</span> 
+<span class="p">}</span>
+
+<span class="n">q</span> <span class="o">=</span> <span class="n">ngx_queue_next</span><span class="p">(</span><span class="n">q</span><span class="p">);</span>
+
+<span class="k">if</span> <span class="p">(</span><span class="n">q</span> <span class="o">==</span> <span class="n">x</span><span class="p">)</span> <span class="p">{</span> <span class="c1">//如果q和x节点直接没有节点，那么就没有必要递归后面了产生q节点的location list，直接递归q的后继节点x，产生x节点location list</span>
+    <span class="n">ngx_http_create_locations_list</span><span class="p">(</span><span class="n">locations</span><span class="p">,</span> <span class="n">x</span><span class="p">);</span>
+    <span class="k">return</span><span class="p">;</span>
+<span class="p">}</span> 
+<span class="n">ngx_queue_split</span><span class="p">(</span><span class="n">locations</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">tail</span><span class="p">);</span> <span class="c1">//location从q节点开始分割，那么现在location就是q节点之前的一段list</span>
+<span class="n">ngx_queue_add</span><span class="p">(</span><span class="o">&amp;</span><span class="n">lq</span><span class="o">-&gt;</span><span class="n">list</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">tail</span><span class="p">);</span> <span class="c1">//q节点的list初始为从q节点开始到最后的一段list</span>
+
+<span class="c1">//原则上因为需要递归两段list，一个为p的location list（从p.next到x.prev），另一段为x.next到location的最后一个元素，这里如果x已经是location的最后一个了，那么就没有必要递归x.next到location的这一段了，因为这一段都是空的。</span>
+
+<span class="k">if</span> <span class="p">(</span><span class="n">x</span> <span class="o">==</span> <span class="n">ngx_queue_sentinel</span><span class="p">(</span><span class="n">locations</span><span class="p">))</span> <span class="p">{</span> 
+    <span class="n">ngx_http_create_locations_list</span><span class="p">(</span><span class="o">&amp;</span><span class="n">lq</span><span class="o">-&gt;</span><span class="n">list</span><span class="p">,</span> <span class="n">ngx_queue_head</span><span class="p">(</span><span class="o">&amp;</span><span class="n">lq</span><span class="o">-&gt;</span><span class="n">list</span><span class="p">));</span>
+    <span class="k">return</span><span class="p">;</span>
+<span class="p">}</span>
+<span class="c1">//到了这里可以知道需要递归两段location list了</span>
+<span class="n">ngx_queue_split</span><span class="p">(</span><span class="o">&amp;</span><span class="n">lq</span><span class="o">-&gt;</span><span class="n">list</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">tail</span><span class="p">);</span><span class="c1">//再次分割，lq-&gt;list剩下p.next到x.prev的一段了</span>
+<span class="n">ngx_queue_add</span><span class="p">(</span><span class="n">locations</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">tail</span><span class="p">);</span> <span class="c1">// 放到location 中去</span>
+
+<span class="n">ngx_http_create_locations_list</span><span class="p">(</span><span class="o">&amp;</span><span class="n">lq</span><span class="o">-&gt;</span><span class="n">list</span><span class="p">,</span> <span class="n">ngx_queue_head</span><span class="p">(</span><span class="o">&amp;</span><span class="n">lq</span><span class="o">-&gt;</span><span class="n">list</span><span class="p">));</span> <span class="c1">//递归p.next到x.prev</span>
+
+<span class="n">ngx_http_create_locations_list</span><span class="p">(</span><span class="n">locations</span><span class="p">,</span> <span class="n">x</span><span class="p">);</span> <span class="c1">//递归x.next到location 最后了</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<p>最终static location tree的生成是从这个static location list中得到的也就是上图中的list。</p>
+<p><img alt="alt" src="https://lh4.googleusercontent.com/-fPu-X_ex1zE/UhxB1zd0X6I/AAAAAAAAALY/exWiLb00N5g/s984/Screen%2520Shot%25202013-06-07%2520at%252011.46.56%2520PM.png" /></p>
+<p>location list的结构中，原始的那个location 的队列中直升下了a1，aa，ab，ac，ad，ae这几个location节点，tree的构建是个递归的过程，首先从location队列中取中间节点，就认为是tree的root节点，它的list指针认为是tree节点，中间节点之前的那段list ，a1 ,aa认为是ab节点的左节点，ac,ad,ae认为是ab节点的右节点。形成了如下形式：</p>
+<p><img alt="alt" src="https://lh4.googleusercontent.com/--Km7TVRp_-I/UhxB2UUSg7I/AAAAAAAAALY/_CPZbbFLchY/s1024/Screen%2520Shot%25202013-06-07%2520at%252011.48.35%2520PM.png" /></p>
+<p>然后递归每个container再进行刚才的操作，最终就能成为文章中最一开始的那个图的样子，对于一个tree的生成最重要的就是，把当前的location list折中，中间的节点的前驱list作为左节点，后继list作为右节点，list指针作为tree节点，然后递归每个节点。</p>
+<p>看下代码：</p>
+<div class="highlight"><pre><span class="k">static</span> <span class="kt">ngx_http_location_tree_node_t</span> <span class="o">*</span>
+<span class="nf">ngx_http_create_locations_tree</span><span class="p">(</span><span class="kt">ngx_conf_t</span> <span class="o">*</span><span class="n">cf</span><span class="p">,</span> <span class="kt">ngx_queue_t</span> <span class="o">*</span><span class="n">locations</span><span class="p">,</span>
+<span class="kt">size_t</span> <span class="n">prefix</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="kt">size_t</span> <span class="n">len</span><span class="p">;</span>
+<span class="kt">ngx_queue_t</span> <span class="o">*</span><span class="n">q</span><span class="p">,</span> <span class="n">tail</span><span class="p">;</span>
+<span class="kt">ngx_http_location_queue_t</span> <span class="o">*</span><span class="n">lq</span><span class="p">;</span>
+<span class="kt">ngx_http_location_tree_node_t</span> <span class="o">*</span><span class="n">node</span><span class="p">;</span>
+
+<span class="n">q</span> <span class="o">=</span> <span class="n">ngx_queue_middle</span><span class="p">(</span><span class="n">locations</span><span class="p">);</span>         <span class="c1">//取中间节点</span>
+
+<span class="n">lq</span> <span class="o">=</span> <span class="p">(</span><span class="kt">ngx_http_location_queue_t</span> <span class="o">*</span><span class="p">)</span> <span class="n">q</span><span class="p">;</span>
+<span class="n">len</span> <span class="o">=</span> <span class="n">lq</span><span class="o">-&gt;</span><span class="n">name</span><span class="o">-&gt;</span><span class="n">len</span> <span class="err">–</span> <span class="n">prefix</span><span class="p">;</span>            <span class="c1">//len是name减去prefix的长度</span>
+
+<span class="n">node</span> <span class="o">=</span> <span class="n">ngx_palloc</span><span class="p">(</span><span class="n">cf</span><span class="o">-&gt;</span><span class="n">pool</span><span class="p">,</span>
+                  <span class="n">offsetof</span><span class="p">(</span><span class="kt">ngx_http_location_tree_node_t</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span> <span class="o">+</span> <span class="n">len</span><span class="p">);</span>
+<span class="k">if</span> <span class="p">(</span><span class="n">node</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="nb">NULL</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">node</span><span class="o">-&gt;</span><span class="n">left</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+<span class="n">node</span><span class="o">-&gt;</span><span class="n">right</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+<span class="n">node</span><span class="o">-&gt;</span><span class="n">tree</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+<span class="n">node</span><span class="o">-&gt;</span><span class="n">exact</span> <span class="o">=</span> <span class="n">lq</span><span class="o">-&gt;</span><span class="n">exact</span><span class="p">;</span>
+<span class="n">node</span><span class="o">-&gt;</span><span class="n">inclusive</span> <span class="o">=</span> <span class="n">lq</span><span class="o">-&gt;</span><span class="n">inclusive</span><span class="p">;</span>
+
+<span class="n">node</span><span class="o">-&gt;</span><span class="n">auto_redirect</span> <span class="o">=</span> <span class="p">(</span><span class="n">u_char</span><span class="p">)</span> <span class="p">((</span><span class="n">lq</span><span class="o">-&gt;</span><span class="n">exact</span> <span class="o">&amp;&amp;</span> <span class="n">lq</span><span class="o">-&gt;</span><span class="n">exact</span><span class="o">-&gt;</span><span class="n">auto_redirect</span><span class="p">)</span>
+                       <span class="o">||</span> <span class="p">(</span><span class="n">lq</span><span class="o">-&gt;</span><span class="n">inclusive</span> <span class="o">&amp;&amp;</span> <span class="n">lq</span><span class="o">-&gt;</span><span class="n">inclusive</span><span class="o">-&gt;</span><span class="n">auto_redirect</span><span class="p">));</span>
+
+<span class="n">node</span><span class="o">-&gt;</span><span class="n">len</span> <span class="o">=</span> <span class="p">(</span><span class="n">u_char</span><span class="p">)</span> <span class="n">len</span><span class="p">;</span>
+<span class="n">ngx_memcpy</span><span class="p">(</span><span class="n">node</span><span class="o">-&gt;</span><span class="n">name</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">lq</span><span class="o">-&gt;</span><span class="n">name</span><span class="o">-&gt;</span><span class="n">data</span><span class="p">[</span><span class="n">prefix</span><span class="p">],</span> <span class="n">len</span><span class="p">);</span>      <span class="c1">//可以看到实际node的name是父节点的增量（不存储公共前缀，也许这是为了节省空间）</span>
+
+<span class="n">ngx_queue_split</span><span class="p">(</span><span class="n">locations</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">tail</span><span class="p">);</span>                  <span class="c1">//location队列是从头节点开始到q节点之前的节点，tail是q节点到location左右节点的队列</span>
+
+<span class="k">if</span> <span class="p">(</span><span class="n">ngx_queue_empty</span><span class="p">(</span><span class="n">locations</span><span class="p">))</span> <span class="p">{</span> 
+    <span class="cm">/*</span>
+<span class="cm">     * ngx_queue_split() insures that if left part is empty,</span>
+<span class="cm">     * then right one is empty too</span>
+<span class="cm">     */</span>
+    <span class="k">goto</span> <span class="n">inclusive</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">node</span><span class="o">-&gt;</span><span class="n">left</span> <span class="o">=</span> <span class="n">ngx_http_create_locations_tree</span><span class="p">(</span><span class="n">cf</span><span class="p">,</span> <span class="n">locations</span><span class="p">,</span> <span class="n">prefix</span><span class="p">);</span> <span class="c1">//递归构建node的左节点</span>
+<span class="k">if</span> <span class="p">(</span><span class="n">node</span><span class="o">-&gt;</span><span class="n">left</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="nb">NULL</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">ngx_queue_remove</span><span class="p">(</span><span class="n">q</span><span class="p">);</span>
+
+<span class="k">if</span> <span class="p">(</span><span class="n">ngx_queue_empty</span><span class="p">(</span><span class="o">&amp;</span><span class="n">tail</span><span class="p">))</span> <span class="p">{</span>
+    <span class="k">goto</span> <span class="n">inclusive</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">node</span><span class="o">-&gt;</span><span class="n">right</span> <span class="o">=</span> <span class="n">ngx_http_create_locations_tree</span><span class="p">(</span><span class="n">cf</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">tail</span><span class="p">,</span> <span class="n">prefix</span><span class="p">);</span><span class="c1">//递归构建node的右节点</span>
+<span class="k">if</span> <span class="p">(</span><span class="n">node</span><span class="o">-&gt;</span><span class="n">right</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="nb">NULL</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="nl">inclusive:</span>
+
+<span class="k">if</span> <span class="p">(</span><span class="n">ngx_queue_empty</span><span class="p">(</span><span class="o">&amp;</span><span class="n">lq</span><span class="o">-&gt;</span><span class="n">list</span><span class="p">))</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="n">node</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">node</span><span class="o">-&gt;</span><span class="n">tree</span> <span class="o">=</span> <span class="n">ngx_http_create_locations_tree</span><span class="p">(</span><span class="n">cf</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">lq</span><span class="o">-&gt;</span><span class="n">list</span><span class="p">,</span> <span class="n">prefix</span> <span class="o">+</span> <span class="n">len</span><span class="p">);</span>      <span class="c1">//根据list指针构造node的tree指针</span>
+<span class="k">if</span> <span class="p">(</span><span class="n">node</span><span class="o">-&gt;</span><span class="n">tree</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="nb">NULL</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">return</span> <span class="n">node</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<blockquote>
+<p>总结：</p>
+<p>static location tree大大优化了精准匹配和前缀匹配的location的查找过程，线性递归查找效率低下，三叉树的左节点代表当前比node节点的name小的节点，右节点代表比当前node节点name大的节点，tree节点表示拥有相同前缀的节点。</p>
+</blockquote></div>
+		<div>
+			<h2>Comments</h2>
+		 									<div>
+	</div>	
+		<footer>
+		  <p>Powered by <a href="http://getpelican.com/">Pelican</a>. Theme based on <a href="http://twitter.github.com/bootstrap/">Twitter Bootstrap</a>.</p>
+		  <p>&copy; djjsindy</p>
+		</footer>
+	  </div>
+
+	</div>
+</body>
+</html>
