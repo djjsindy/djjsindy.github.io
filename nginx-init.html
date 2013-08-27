@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>djjsindy</title>
+	<meta name="description" content="">
+	<meta name="author" content="djjsindy">
+
+	<!-- HTML5 shim, for IE6-8 support of HTML elements -->
+	<!--[if lt IE 9]>
+		<script src="/theme/html5.js"></script>
+	<![endif]-->
+
+	<!-- Styles -->
+	<link href="/theme/bootstrap.min.css" rel="stylesheet">
+	<link href="/theme/local.css" rel="stylesheet">
+	<link href="/theme/pygments.css" rel="stylesheet">
+
+    <!-- Feeds -->
+        <link href="/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="djjsindy Atom Feed" />
+        
+	<script>var _gaq=[['_setAccount','UA-43260693-1'],['_trackPageview']];(function(d,t){var g=d.createElement(t),s=d.getElementsByTagName(t)[0];g.src='//www.google-analytics.com/ga.js';s.parentNode.insertBefore(g,s)}(document,'script'))</script>
+	</head>
+<body>
+			<div class="topbar">
+	  <div class="topbar-inner">
+		<div class="container-fluid">
+		  <a class="brand" href="/">djjsindy</a>
+			<ul class="nav">
+																										<li class="active"><a href="/category/nginx.html">nginx</a></li>
+									<li ><a href="/category/tomcat.html">tomcat</a></li>
+							</ul>
+			<p class="pull-right"><a href="/archives.html">[archives]</a> <a href="/tags.html">[tags]</a></p>
+		</div>
+	  </div>
+	</div>
+
+	<div class="container-fluid">
+	  <div class="sidebar">
+		<div class="well">
+			<h3>Blogroll</h3>
+			<ul>
+								<li><a href="djjsindy.blog.chinaunix.net">djjsindy-chinaunix</a></li>
+								<li><a href="http://nginx.org/">nginx</a></li>
+							</ul>
+			<div class="social">
+			<h3>Social</h3>
+			<ul>
+							</ul>
+			</div>
+		</div>
+	  </div>
+	  <div class="content">
+							<div class='article'>
+		<div class="page-header"><h1>nginx配置初始化过程</h1></div>
+		<div class="well small">Permalink: <a class="more" href="/nginx-init.html">2013-06-05 15:50:00</a>
+by <a class="url fn" href="/author/djjsindy.html">djjsindy </a>
+ in <a href="/category/nginx.html">nginx</a>
+tags: <a href="/tag/nginx.html">nginx</a> </div>
+		<div><p>nginx解析配置文件，将解析出来得配置存放在<code>ngx_cycle_s</code>的<code>conf_ctx</code>中，<code>conf_ctx</code>是个四级指针，因为保存这些配置需要context，而这些context是有层级关系，最终的配置结构如图：</p>
+<p><img alt="alt" src="https://lh6.googleusercontent.com/-3mkLLP0KDo0/Uhy8LX3gdoI/AAAAAAAAAL8/XuHLZ_VAiL8/s512/27767798_1370416906jegE.png" /></p>
+<p>http模块的配置有些复杂，由于server的配置还可以出现在http模块中，同时location的配置可以出现在http模块或者server模块中，所以对于http来说也就是最上面的那个<code>ngx_http_ctx_conf_t</code>有srv_conf和loc_conf是十分有必要的，这两个指针后面的结构体数组保存了在http中的那些server的和location的配置。同样对于每个server来说，不需要单独的main配置了，直接引用main的就可以。每个server必须有自己单独的<code>ngx_http_core_srv_conf_t</code>，来保存当前server块内的配置，这个配置最后会和http的里面的<code>ngx_http_core_srv_conf_t</code>做merge，这个merge是把父server的配置merge到子server配置上面。对于location的配置，在http和server中都可以配置，那么merge的操作需要首先把http的location配置merge到每个server配置中，然后每个server的location配置再和每个location模块中的配置进行merge，这里location配置需要merge两次。举例<code>ngx_http_core_module</code>模块merge的过程：</p>
+<p><img alt="alt" src="https://lh3.googleusercontent.com/-DbfydqnOWbA/Uhy8LacRRmI/AAAAAAAAAL8/MkKuUWW1Xbk/s576/27767798_1370417515HdmN.png" /></p>
+<p>merge过程是按照module一个一个module的merge，第一步从main配置里面的servers，遍历每个server，把main里面的server配置merge到每个server的配置中，然后把main里面的location配置merge到每个server的location的配置中。第二步再次遍历每个server的locations，把这个server的location的配置merge到具体的每个location中。
+代码：</p>
+<div class="highlight"><pre><span class="k">static</span> <span class="kt">char</span> <span class="o">*</span>
+<span class="nf">ngx_http_merge_servers</span><span class="p">(</span><span class="kt">ngx_conf_t</span> <span class="o">*</span><span class="n">cf</span><span class="p">,</span> <span class="kt">ngx_http_core_main_conf_t</span> <span class="o">*</span><span class="n">cmcf</span><span class="p">,</span>
+<span class="kt">ngx_http_module_t</span> <span class="o">*</span><span class="n">module</span><span class="p">,</span> <span class="kt">ngx_uint_t</span> <span class="n">ctx_index</span><span class="p">)</span> <span class="c1">//cmcf代表http的main配置</span>
+<span class="p">{</span> 
+<span class="kt">char</span> <span class="o">*</span><span class="n">rv</span><span class="p">;</span> 
+<span class="kt">ngx_uint_t</span> <span class="n">s</span><span class="p">;</span> 
+<span class="kt">ngx_http_conf_ctx_t</span> <span class="o">*</span><span class="n">ctx</span><span class="p">,</span> <span class="n">saved</span><span class="p">;</span>
+<span class="kt">ngx_http_core_loc_conf_t</span> <span class="o">*</span><span class="n">clcf</span><span class="p">;</span>
+<span class="kt">ngx_http_core_srv_conf_t</span> <span class="o">**</span><span class="n">cscfp</span><span class="p">;</span>
+
+<span class="n">cscfp</span> <span class="o">=</span> <span class="n">cmcf</span><span class="o">-&gt;</span><span class="n">servers</span><span class="p">.</span><span class="n">elts</span><span class="p">;</span>             <span class="c1">//得到servers数组，cmcf是main层的配置</span>
+<span class="n">ctx</span> <span class="o">=</span> <span class="p">(</span><span class="kt">ngx_http_conf_ctx_t</span> <span class="o">*</span><span class="p">)</span> <span class="n">cf</span><span class="o">-&gt;</span><span class="n">ctx</span><span class="p">;</span> <span class="c1">//ctx是main的 ngx_http_conf_ctx_t</span>
+<span class="n">saved</span> <span class="o">=</span> <span class="o">*</span><span class="n">ctx</span><span class="p">;</span>
+<span class="n">rv</span> <span class="o">=</span> <span class="n">NGX_CONF_OK</span><span class="p">;</span>
+
+<span class="k">for</span> <span class="p">(</span><span class="n">s</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">s</span> <span class="o">&lt;</span> <span class="n">cmcf</span><span class="o">-&gt;</span><span class="n">servers</span><span class="p">.</span><span class="n">nelts</span><span class="p">;</span> <span class="n">s</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span> <span class="c1">//遍历每个server，把main的配置merge到每个server中</span>
+
+    <span class="cm">/* merge the server{}s&#39; srv_conf&#39;s */</span>
+
+    <span class="n">ctx</span><span class="o">-&gt;</span><span class="n">srv_conf</span> <span class="o">=</span> <span class="n">cscfp</span><span class="p">[</span><span class="n">s</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">srv_conf</span><span class="p">;</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">module</span><span class="o">-&gt;</span><span class="n">merge_srv_conf</span><span class="p">)</span> <span class="p">{</span>           <span class="c1">//调用模块的merge server操作</span>
+        <span class="n">rv</span> <span class="o">=</span> <span class="n">module</span><span class="o">-&gt;</span><span class="n">merge_srv_conf</span><span class="p">(</span><span class="n">cf</span><span class="p">,</span> <span class="n">saved</span><span class="p">.</span><span class="n">srv_conf</span><span class="p">[</span><span class="n">ctx_index</span><span class="p">],</span>
+                                    <span class="n">cscfp</span><span class="p">[</span><span class="n">s</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">srv_conf</span><span class="p">[</span><span class="n">ctx_index</span><span class="p">]);</span> <span class="c1">//save.srv_conf是父server配置，cscf-&gt;ctx-&gt;srv_conf是当前server的配置，相当于图中的第一步</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">rv</span> <span class="o">!=</span> <span class="n">NGX_CONF_OK</span><span class="p">)</span> <span class="p">{</span>
+            <span class="k">goto</span> <span class="n">failed</span><span class="p">;</span>
+        <span class="p">}</span> 
+    <span class="p">}</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">module</span><span class="o">-&gt;</span><span class="n">merge_loc_conf</span><span class="p">)</span> <span class="p">{</span> <span class="c1">//调用模块的merge location操作，把父location配置merge到每个server的location配置相当于图中的第一步</span>
+
+        <span class="cm">/* merge the server{}&#39;s loc_conf */</span>
+
+        <span class="n">ctx</span><span class="o">-&gt;</span><span class="n">loc_conf</span> <span class="o">=</span> <span class="n">cscfp</span><span class="p">[</span><span class="n">s</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">loc_conf</span><span class="p">;</span>
+
+        <span class="n">rv</span> <span class="o">=</span> <span class="n">module</span><span class="o">-&gt;</span><span class="n">merge_loc_conf</span><span class="p">(</span><span class="n">cf</span><span class="p">,</span> <span class="n">saved</span><span class="p">.</span><span class="n">loc_conf</span><span class="p">[</span><span class="n">ctx_index</span><span class="p">],</span>
+                                    <span class="n">cscfp</span><span class="p">[</span><span class="n">s</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">loc_conf</span><span class="p">[</span><span class="n">ctx_index</span><span class="p">]);</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">rv</span> <span class="o">!=</span> <span class="n">NGX_CONF_OK</span><span class="p">)</span> <span class="p">{</span>
+            <span class="k">goto</span> <span class="n">failed</span><span class="p">;</span>
+        <span class="p">}</span>
+
+        <span class="cm">/* merge the locations{}&#39; loc_conf&#39;s */</span>
+        <span class="n">clcf</span> <span class="o">=</span> <span class="n">cscfp</span><span class="p">[</span><span class="n">s</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">loc_conf</span><span class="p">[</span><span class="n">ngx_http_core_module</span><span class="p">.</span><span class="n">ctx_index</span><span class="p">];</span>
+
+        <span class="n">rv</span> <span class="o">=</span> <span class="n">ngx_http_merge_locations</span><span class="p">(</span><span class="n">cf</span><span class="p">,</span> <span class="n">clcf</span><span class="o">-&gt;</span><span class="n">locations</span><span class="p">,</span>
+                                      <span class="n">cscfp</span><span class="p">[</span><span class="n">s</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">loc_conf</span><span class="p">,</span>
+                                      <span class="n">module</span><span class="p">,</span> <span class="n">ctx_index</span><span class="p">);</span> <span class="c1">//该merge每个server的location配置到每个location的配置中了，相当于图中的第二步</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">rv</span> <span class="o">!=</span> <span class="n">NGX_CONF_OK</span><span class="p">)</span> <span class="p">{</span>
+            <span class="k">goto</span> <span class="n">failed</span><span class="p">;</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<p>server中location和location的merge过程</p>
+<div class="highlight"><pre><span class="k">static</span> <span class="kt">char</span> <span class="o">*</span>
+<span class="nf">ngx_http_merge_locations</span><span class="p">(</span><span class="kt">ngx_conf_t</span> <span class="o">*</span><span class="n">cf</span><span class="p">,</span> <span class="kt">ngx_queue_t</span> <span class="o">*</span><span class="n">locations</span><span class="p">,</span>
+<span class="kt">void</span> <span class="o">**</span><span class="n">loc_conf</span><span class="p">,</span> <span class="kt">ngx_http_module_t</span> <span class="o">*</span><span class="n">module</span><span class="p">,</span> <span class="kt">ngx_uint_t</span> <span class="n">ctx_index</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="kt">char</span> <span class="o">*</span><span class="n">rv</span><span class="p">;</span>
+<span class="kt">ngx_queue_t</span> <span class="o">*</span><span class="n">q</span><span class="p">;</span>
+<span class="kt">ngx_http_conf_ctx_t</span> <span class="o">*</span><span class="n">ctx</span><span class="p">,</span> <span class="n">saved</span><span class="p">;</span>
+<span class="kt">ngx_http_core_loc_conf_t</span> <span class="o">*</span><span class="n">clcf</span><span class="p">;</span>
+<span class="kt">ngx_http_location_queue_t</span> <span class="o">*</span><span class="n">lq</span><span class="p">;</span>
+
+<span class="k">if</span> <span class="p">(</span><span class="n">locations</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="n">NGX_CONF_OK</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">ctx</span> <span class="o">=</span> <span class="p">(</span><span class="kt">ngx_http_conf_ctx_t</span> <span class="o">*</span><span class="p">)</span> <span class="n">cf</span><span class="o">-&gt;</span><span class="n">ctx</span><span class="p">;</span>
+<span class="n">saved</span> <span class="o">=</span> <span class="o">*</span><span class="n">ctx</span><span class="p">;</span>
+
+<span class="k">for</span> <span class="p">(</span><span class="n">q</span> <span class="o">=</span> <span class="n">ngx_queue_head</span><span class="p">(</span><span class="n">locations</span><span class="p">);</span>      <span class="c1">//遍历server中的locations队列</span>
+     <span class="n">q</span> <span class="o">!=</span> <span class="n">ngx_queue_sentinel</span><span class="p">(</span><span class="n">locations</span><span class="p">);</span>
+     <span class="n">q</span> <span class="o">=</span> <span class="n">ngx_queue_next</span><span class="p">(</span><span class="n">q</span><span class="p">))</span>
+<span class="p">{</span>
+    <span class="n">lq</span> <span class="o">=</span> <span class="p">(</span><span class="kt">ngx_http_location_queue_t</span> <span class="o">*</span><span class="p">)</span> <span class="n">q</span><span class="p">;</span>
+
+    <span class="n">clcf</span> <span class="o">=</span> <span class="n">lq</span><span class="o">-&gt;</span><span class="n">exact</span> <span class="o">?</span> <span class="n">lq</span><span class="o">-&gt;</span><span class="n">exact</span> <span class="o">:</span> <span class="n">lq</span><span class="o">-&gt;</span><span class="n">inclusive</span><span class="p">;</span> 
+    <span class="n">ctx</span><span class="o">-&gt;</span><span class="n">loc_conf</span> <span class="o">=</span> <span class="n">clcf</span><span class="o">-&gt;</span><span class="n">loc_conf</span><span class="p">;</span>
+
+    <span class="n">rv</span> <span class="o">=</span> <span class="n">module</span><span class="o">-&gt;</span><span class="n">merge_loc_conf</span><span class="p">(</span><span class="n">cf</span><span class="p">,</span> <span class="n">loc_conf</span><span class="p">[</span><span class="n">ctx_index</span><span class="p">],</span>
+                                <span class="n">clcf</span><span class="o">-&gt;</span><span class="n">loc_conf</span><span class="p">[</span><span class="n">ctx_index</span><span class="p">]);</span> <span class="c1">//loc_conf代表server下location配置，clcf-&gt;loc_conf代表每个location的配置</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">rv</span> <span class="o">!=</span> <span class="n">NGX_CONF_OK</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">rv</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="n">rv</span> <span class="o">=</span> <span class="n">ngx_http_merge_locations</span><span class="p">(</span><span class="n">cf</span><span class="p">,</span> <span class="n">clcf</span><span class="o">-&gt;</span><span class="n">locations</span><span class="p">,</span> <span class="n">clcf</span><span class="o">-&gt;</span><span class="n">loc_conf</span><span class="p">,</span>
+                                  <span class="n">module</span><span class="p">,</span> <span class="n">ctx_index</span><span class="p">);</span>        <span class="c1">//递归嵌套location</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">rv</span> <span class="o">!=</span> <span class="n">NGX_CONF_OK</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">rv</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</pre></div></div>
+		<div>
+			<h2>Comments</h2>
+		 									<div>
+	</div>	
+		<footer>
+		  <p>Powered by <a href="http://getpelican.com/">Pelican</a>. Theme based on <a href="http://twitter.github.com/bootstrap/">Twitter Bootstrap</a>.</p>
+		  <p>&copy; djjsindy</p>
+		</footer>
+	  </div>
+
+	</div>
+</body>
+</html>
