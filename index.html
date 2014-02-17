@@ -1,343 +1,137 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>djjsindy</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="">
-    <meta name="author" content="djjsindy">
+<head>
+	<meta charset="utf-8">
+	<title>djjsindy</title>
+	<meta name="description" content="">
+	<meta name="author" content="djjsindy">
 
-    <!-- Le styles -->
-    <link rel="stylesheet" href="/theme/css/bootstrap.min.css" type="text/css" />
-    <style type="text/css">
-      body {
-        padding-top: 60px;
-        padding-bottom: 40px;
-      }
-      .sidebar-nav {
-        padding: 9px 0;
-      }
-      .tag-1 {
-        font-size: 13pt;
-      }
-      .tag-2 {
-        font-size: 10pt;
-      }
-      .tag-2 {
-        font-size: 8pt;
-      }
-      .tag-4 {
-        font-size: 6pt;
-     }
-    </style>
-    <link href="/theme/css/bootstrap-responsive.min.css" rel="stylesheet">
-        <link href="/theme/css/font-awesome.css" rel="stylesheet">
+	<!-- HTML5 shim, for IE6-8 support of HTML elements -->
+	<!--[if lt IE 9]>
+		<script src="/theme/html5.js"></script>
+	<![endif]-->
 
-    <link href="/theme/css/pygments.css" rel="stylesheet">
+	<!-- Styles -->
+	<link href="/theme/bootstrap.min.css" rel="stylesheet">
+	<link href="/theme/local.css" rel="stylesheet">
+	<link href="/theme/pygments.css" rel="stylesheet">
 
-    <!-- Le HTML5 shim, for IE6-8 support of HTML5 elements -->
-    <!--[if lt IE 9]>
-      <script src="//html5shim.googlecode.com/svn/trunk/html5.js"></script>
-    <![endif]-->
+    <!-- Feeds -->
 
-    <!-- Le fav and touch icons -->
-    <link rel="shortcut icon" href="/theme/images/favicon.ico">
-    <link rel="apple-touch-icon" href="/theme/images/apple-touch-icon.png">
-    <link rel="apple-touch-icon" sizes="72x72" href="/theme/images/apple-touch-icon-72x72.png">
-    <link rel="apple-touch-icon" sizes="114x114" href="/theme/images/apple-touch-icon-114x114.png">
+<script>var _gaq=[['_setAccount','UA-43260693-1'],['_trackPageview']];(function(d,t){var g=d.createElement(t),s=d.getElementsByTagName(t)[0];g.src='//www.google-analytics.com/ga.js';s.parentNode.insertBefore(g,s)}(document,'script'))</script>
+</head>
+<body>
+	<div class="topbar">
+	  <div class="topbar-inner">
+		<div class="container-fluid">
+		  <a class="brand" href="/">djjsindy</a>
+			<ul class="nav">
+					<li ><a href="/category/nginx.html">nginx</a></li>
+					<li ><a href="/category/ptmalloc.html">ptmalloc</a></li>
+					<li ><a href="/category/tomcat.html">tomcat</a></li>
+			</ul>
+			<p class="pull-right"><a href="/archives.html">[archives]</a> <a href="/tags.html">[tags]</a></p>
+		</div>
+	  </div>
+	</div>
 
-    <link href="/" type="application/atom+xml" rel="alternate" title="djjsindy ATOM Feed" />
-
-  </head>
-
-  <body>
-
-    <div class="navbar navbar-fixed-top">
-      <div class="navbar-inner">
-        <div class="container-fluid">
-          <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
-            <span class="icon-bar"></span>
-            <span class="icon-bar"></span>
-            <span class="icon-bar"></span>
-          </a>
-          <a class="brand" href="/index.html">djjsindy </a>
-          <div class="nav-collapse">
-            <ul class="nav">
-                          <li class="divider-vertical"></li>
-                  <li >
-                    <a href="/category/nginx.html">
-						<i class="icon-folder-open icon-large"></i>nginx
-					</a>
-                  </li>
-                  <li >
-                    <a href="/category/ptmalloc.html">
-						<i class="icon-folder-open icon-large"></i>ptmalloc
-					</a>
-                  </li>
-                  <li >
-                    <a href="/category/tomcat.html">
-						<i class="icon-folder-open icon-large"></i>tomcat
-					</a>
-                  </li>
-
-                          <ul class="nav pull-right">
-                                <li><a href="/archives.html"><i class="icon-th-list"></i>Archives</a></li>
-                          </ul>
-
-            </ul>
-            <!--<p class="navbar-text pull-right">Logged in as <a href="#">username</a></p>-->
-          </div><!--/.nav-collapse -->
-        </div>
-      </div>
-    </div>
-
-    <div class="container-fluid">
-      <div class="row">
-        <div class="span9" id="content">
-        <div class="article">
-                <h1><a href="/ptmalloc.html">ptmalloc中的fastbin chunk的合并过程</a></h1>
-                <div class="well small"><footer class="post-info">
-<span class="label">Date</span>
-<abbr class="published" title="2014-02-17T10:04:00">
-        <i class="icon-calendar"></i>Mon 17 February 2014
-</abbr>
-<span class="label">By</span>
-<a href="/author/djjsindy.html"><i class="icon-user"></i>djjsindy</a>
-<span class="label">Category</span>
-<a href="/category/ptmalloc.html"><i class="icon-folder-open"></i>ptmalloc</a>.
-
-
-<span class="label">Tags</span>
-	<a href="/tag/ptmalloc.html"><i class="icon-tag"></i>ptmalloc</a>
-</footer><!-- /.post-info --></div>
-                <div class="summary"><p>最近在设计一个memcache协议队列的内存管理模块，其实<code>malloc</code>和<code>free</code>并不是想象中的那种，<code>malloc</code>完空间<code>free</code>就会马上把内存返回给操作系统，所以了解一下glibc 中malloc和free函数的实现是十分必要的。了解了glibc中<code>malloc</code>实现原理对于设计一个自己的内存管理模块是十分有意义的，可以从中学到很多的优良设计。</p>
-                        <a class="btn primary xsmall" href="/ptmalloc.html">more ...</a>
-                </div>
-        </div>
-        <hr />
-        <div class="article">
-                <h1><a href="/nginx-pointer.html">图解Nginx 中的4级指针</a></h1>
-                <div class="well small"><footer class="post-info">
-<span class="label">Date</span>
-<abbr class="published" title="2013-08-08T22:45:00">
-        <i class="icon-calendar"></i>Thu 08 August 2013
-</abbr>
-<span class="label">By</span>
-<a href="/author/djjsindy.html"><i class="icon-user"></i>djjsindy</a>
-<span class="label">Category</span>
-<a href="/category/nginx.html"><i class="icon-folder-open"></i>nginx</a>.
+	<div class="container-fluid">
+	  <div class="sidebar">
+		<div class="well">
+			<h3>Blogroll</h3>
+			<ul>
+				<li><a href="djjsindy.blog.chinaunix.net">djjsindy-chinaunix</a></li>
+				<li><a href="http://nginx.org/">nginx</a></li>
+			</ul>
+			<div class="social">
+			<h3>Social</h3>
+			<ul>
+			</ul>
+			</div>
+		</div>
+	  </div>
+	  <div class="content">
+<div class="page-header"><h1> djjsindy </h1></div>
+<div class='article'>
+	<h2>ptmalloc中的fastbin chunk的合并过程</h2>
+	<div class="well small">Permalink: <a class="more" href="/ptmalloc.html">2014-02-17 10:04:00</a>
+by <a class="url fn" href="/author/djjsindy.html">djjsindy </a>
+ in <a href="/category/ptmalloc.html">ptmalloc</a>
+tags: <a href="/tag/ptmalloc.html">ptmalloc</a> </div>
+	<div class="summary"><p>最近在设计一个memcache协议队列的内存管理模块，其实<code>malloc</code>和<code>free</code>并不是想象中的那种，<code>malloc</code>完空间<code>free</code>就会马上把内存返回给操作系统，所以了解一下glibc 中malloc和free函数的实现是十分必要的。了解了glibc中<code>malloc</code>实现原理对于设计一个自己的内存管理模块是十分有意义的，可以从中学到很多的优良设计。</p> <a class="btn primary xsmall" href="/ptmalloc.html">more…</a>
+	</div>
+</div>	
+<div class='article'>
+	<h2>图解Nginx 中的4级指针</h2>
+	<div class="well small">Permalink: <a class="more" href="/nginx-pointer.html">2013-08-08 22:45:00</a>
+by <a class="url fn" href="/author/djjsindy.html">djjsindy </a>
+ in <a href="/category/nginx.html">nginx</a>
+tags: <a href="/tag/nginx.html">nginx</a> </div>
+	<div class="summary"><p>nginx的所有配置结构体全部放在一个cycle的四级指针中，本文就具体分析一下每级指针究竟指向的是什么</p> <a class="btn primary xsmall" href="/nginx-pointer.html">more…</a>
+	</div>
+</div>	
+<div class='article'>
+	<h2>tomcat output buffer</h2>
+	<div class="well small">Permalink: <a class="more" href="/tomcat-output-buffer.html">2013-07-19 15:32:00</a>
+by <a class="url fn" href="/author/djjsindy.html">djjsindy </a>
+ in <a href="/category/tomcat.html">tomcat</a>
+tags: <a href="/tag/tomcat.html">tomcat</a> </div>
+	<div class="summary"><p>以前一直没搞清楚tomcat输出的buffer的结构，在tomcat中有两对response和request，其中一组是对http请求header的最基本的封装，另一组是对servlet规范中response和request的实现，这组是调用servlet中service方法的request和response。在这两对request和response都有一个内在的buffer，其中servlet规范那组是缓冲servlet中的输出的，缓冲response.getWriter().write()的buffer，另外一组response request的buffer是缓冲http header的一些信息的。</p> <a class="btn primary xsmall" href="/tomcat-output-buffer.html">more…</a>
+	</div>
+</div>	
+<div class='article'>
+	<h2>tomcat的异步servlet处理</h2>
+	<div class="well small">Permalink: <a class="more" href="/tomcat-async.html">2013-07-17 12:02:00</a>
+by <a class="url fn" href="/author/djjsindy.html">djjsindy </a>
+ in <a href="/category/tomcat.html">tomcat</a>
+tags: <a href="/tag/tomcat.html">tomcat</a> </div>
+	<div class="summary"><p>这个是以前看的，由于最近工作中用到异步servlet，看了一下tomcat在对servlet3.0中AsyncContext的实现过程，总结一下，使用异步servlet主要原因就是因为，在service方法中业务逻辑如果碰到io操作时间比较长的操作，这样这个service方法就会长时间占用tomcat容器线程池中的线程，这样是不利于其他请求的处理的，当线程池中的线程处理任务时，任务由于长时间io操作，肯定会阻塞线程处理其他任务，引入异步servlet的目的就是将容器线程池和业务线程池分离开。在处理大io的业务操作的时候，把这个操作移动到业务线程池中进行，释放容器线程，使得容器线程处理其他任务，在业务逻辑执行完毕之后，然后在通知tomcat容器线程池来继续后面的操作，这个操作应该是把处理结果commit到客户端或者是dispatch到其他servlet上。</p> <a class="btn primary xsmall" href="/tomcat-async.html">more…</a>
+	</div>
+</div>	
+<div class='article'>
+	<h2>nginx request buf</h2>
+	<div class="well small">Permalink: <a class="more" href="/nginx-header-buf.html">2013-06-26 15:45:00</a>
+by <a class="url fn" href="/author/djjsindy.html">djjsindy </a>
+ in <a href="/category/nginx.html">nginx</a>
+tags: <a href="/tag/nginx.html">nginx</a> </div>
+	<div class="summary"><p>nginx在接收到客户端得请求之后，就开始解析http请求，也就是解析http header，需要分配一段buf来接收这些数据，nginx并不知道这个http header的大小，在nginx配置中<code>client_header_buffer_size</code>和<code>large_client_header_buffers</code>这两个配置项起到了作用</p> <a class="btn primary xsmall" href="/nginx-header-buf.html">more…</a>
+	</div>
+</div>	
+<div class='article'>
+	<h2>nginx hash结构存储</h2>
+	<div class="well small">Permalink: <a class="more" href="/nginx-hash.html">2013-06-18 17:34:00</a>
+by <a class="url fn" href="/author/djjsindy.html">djjsindy </a>
+ in <a href="/category/nginx.html">nginx</a>
+tags: <a href="/tag/nginx.html">nginx</a> </div>
+	<div class="summary"><p>nginx在存储server_name和ngx_http_core_srv_conf_t的映射的时候用到了hash结构</p> <a class="btn primary xsmall" href="/nginx-hash.html">more…</a>
+	</div>
+</div>	
+<div class='article'>
+	<h2>nginx static location tree</h2>
+	<div class="well small">Permalink: <a class="more" href="/nginx-static-location-tree.html">2013-06-07 23:56:00</a>
+by <a class="url fn" href="/author/djjsindy.html">djjsindy </a>
+ in <a href="/category/nginx.html">nginx</a>
+tags: <a href="/tag/nginx.html">nginx</a> </div>
+	<div class="summary"><p>nginx在处理location的配置的时候，用到了一种三叉排序树，加速了通过request的url和location的映射速度。</p> <a class="btn primary xsmall" href="/nginx-static-location-tree.html">more…</a>
+	</div>
+</div>	
+<div class='article'>
+	<h2>nginx配置初始化过程</h2>
+	<div class="well small">Permalink: <a class="more" href="/nginx-init.html">2013-06-05 15:50:00</a>
+by <a class="url fn" href="/author/djjsindy.html">djjsindy </a>
+ in <a href="/category/nginx.html">nginx</a>
+tags: <a href="/tag/nginx.html">nginx</a> </div>
+	<div class="summary"><p>nginx解析配置文件，将解析出来得配置存放在<code>ngx_cycle_s</code>的<code>conf_ctx</code>中，<code>conf_ctx</code>是个四级指针，因为保存这些配置需要context，而这些context是有层级关系</p> <a class="btn primary xsmall" href="/nginx-init.html">more…</a>
+	</div>
+</div>	
 
 
-<span class="label">Tags</span>
-	<a href="/tag/nginx.html"><i class="icon-tag"></i>nginx</a>
-</footer><!-- /.post-info --></div>
-                <div class="summary"><p>nginx的所有配置结构体全部放在一个cycle的四级指针中，本文就具体分析一下每级指针究竟指向的是什么</p>
-                        <a class="btn primary xsmall" href="/nginx-pointer.html">more ...</a>
-                </div>
-        </div>
-        <hr />
-        <div class="article">
-                <h1><a href="/tomcat-output-buffer.html">tomcat output buffer</a></h1>
-                <div class="well small"><footer class="post-info">
-<span class="label">Date</span>
-<abbr class="published" title="2013-07-19T15:32:00">
-        <i class="icon-calendar"></i>Fri 19 July 2013
-</abbr>
-<span class="label">By</span>
-<a href="/author/djjsindy.html"><i class="icon-user"></i>djjsindy</a>
-<span class="label">Category</span>
-<a href="/category/tomcat.html"><i class="icon-folder-open"></i>tomcat</a>.
+		<footer>
+		  <p>Powered by <a href="http://getpelican.com/">Pelican</a>. Theme based on <a href="http://twitter.github.com/bootstrap/">Twitter Bootstrap</a>.</p>
+		  <p>&copy; djjsindy</p>
+		</footer>
+	  </div>
 
-
-<span class="label">Tags</span>
-	<a href="/tag/tomcat.html"><i class="icon-tag"></i>tomcat</a>
-</footer><!-- /.post-info --></div>
-                <div class="summary"><p>以前一直没搞清楚tomcat输出的buffer的结构，在tomcat中有两对response和request，其中一组是对http请求header的最基本的封装，另一组是对servlet规范中response和request的实现，这组是调用servlet中service方法的request和response。在这两对request和response都有一个内在的buffer，其中servlet规范那组是缓冲servlet中的输出的，缓冲response.getWriter().write()的buffer，另外一组response request的buffer是缓冲http header的一些信息的。</p>
-                        <a class="btn primary xsmall" href="/tomcat-output-buffer.html">more ...</a>
-                </div>
-        </div>
-        <hr />
-        <div class="article">
-                <h1><a href="/tomcat-async.html">tomcat的异步servlet处理</a></h1>
-                <div class="well small"><footer class="post-info">
-<span class="label">Date</span>
-<abbr class="published" title="2013-07-17T12:02:00">
-        <i class="icon-calendar"></i>Wed 17 July 2013
-</abbr>
-<span class="label">By</span>
-<a href="/author/djjsindy.html"><i class="icon-user"></i>djjsindy</a>
-<span class="label">Category</span>
-<a href="/category/tomcat.html"><i class="icon-folder-open"></i>tomcat</a>.
-
-
-<span class="label">Tags</span>
-	<a href="/tag/tomcat.html"><i class="icon-tag"></i>tomcat</a>
-</footer><!-- /.post-info --></div>
-                <div class="summary"><p>这个是以前看的，由于最近工作中用到异步servlet，看了一下tomcat在对servlet3.0中AsyncContext的实现过程，总结一下，使用异步servlet主要原因就是因为，在service方法中业务逻辑如果碰到io操作时间比较长的操作，这样这个service方法就会长时间占用tomcat容器线程池中的线程，这样是不利于其他请求的处理的，当线程池中的线程处理任务时，任务由于长时间io操作，肯定会阻塞线程处理其他任务，引入异步servlet的目的就是将容器线程池和业务线程池分离开。在处理大io的业务操作的时候，把这个操作移动到业务线程池中进行，释放容器线程，使得容器线程处理其他任务，在业务逻辑执行完毕之后，然后在通知tomcat容器线程池来继续后面的操作，这个操作应该是把处理结果commit到客户端或者是dispatch到其他servlet上。</p>
-                        <a class="btn primary xsmall" href="/tomcat-async.html">more ...</a>
-                </div>
-        </div>
-        <hr />
-        <div class="article">
-                <h1><a href="/nginx-header-buf.html">nginx request buf</a></h1>
-                <div class="well small"><footer class="post-info">
-<span class="label">Date</span>
-<abbr class="published" title="2013-06-26T15:45:00">
-        <i class="icon-calendar"></i>Wed 26 June 2013
-</abbr>
-<span class="label">By</span>
-<a href="/author/djjsindy.html"><i class="icon-user"></i>djjsindy</a>
-<span class="label">Category</span>
-<a href="/category/nginx.html"><i class="icon-folder-open"></i>nginx</a>.
-
-
-<span class="label">Tags</span>
-	<a href="/tag/nginx.html"><i class="icon-tag"></i>nginx</a>
-</footer><!-- /.post-info --></div>
-                <div class="summary"><p>nginx在接收到客户端得请求之后，就开始解析http请求，也就是解析http header，需要分配一段buf来接收这些数据，nginx并不知道这个http header的大小，在nginx配置中<code>client_header_buffer_size</code>和<code>large_client_header_buffers</code>这两个配置项起到了作用</p>
-                        <a class="btn primary xsmall" href="/nginx-header-buf.html">more ...</a>
-                </div>
-        </div>
-        <hr />
-        <div class="article">
-                <h1><a href="/nginx-hash.html">nginx hash结构存储</a></h1>
-                <div class="well small"><footer class="post-info">
-<span class="label">Date</span>
-<abbr class="published" title="2013-06-18T17:34:00">
-        <i class="icon-calendar"></i>Tue 18 June 2013
-</abbr>
-<span class="label">By</span>
-<a href="/author/djjsindy.html"><i class="icon-user"></i>djjsindy</a>
-<span class="label">Category</span>
-<a href="/category/nginx.html"><i class="icon-folder-open"></i>nginx</a>.
-
-
-<span class="label">Tags</span>
-	<a href="/tag/nginx.html"><i class="icon-tag"></i>nginx</a>
-</footer><!-- /.post-info --></div>
-                <div class="summary"><p>nginx在存储server_name和ngx_http_core_srv_conf_t的映射的时候用到了hash结构</p>
-                        <a class="btn primary xsmall" href="/nginx-hash.html">more ...</a>
-                </div>
-        </div>
-        <hr />
-        <div class="article">
-                <h1><a href="/nginx-static-location-tree.html">nginx static location tree</a></h1>
-                <div class="well small"><footer class="post-info">
-<span class="label">Date</span>
-<abbr class="published" title="2013-06-07T23:56:00">
-        <i class="icon-calendar"></i>Fri 07 June 2013
-</abbr>
-<span class="label">By</span>
-<a href="/author/djjsindy.html"><i class="icon-user"></i>djjsindy</a>
-<span class="label">Category</span>
-<a href="/category/nginx.html"><i class="icon-folder-open"></i>nginx</a>.
-
-
-<span class="label">Tags</span>
-	<a href="/tag/nginx.html"><i class="icon-tag"></i>nginx</a>
-</footer><!-- /.post-info --></div>
-                <div class="summary"><p>nginx在处理location的配置的时候，用到了一种三叉排序树，加速了通过request的url和location的映射速度。</p>
-                        <a class="btn primary xsmall" href="/nginx-static-location-tree.html">more ...</a>
-                </div>
-        </div>
-        <hr />
-        <div class="article">
-                <h1><a href="/nginx-init.html">nginx配置初始化过程</a></h1>
-                <div class="well small"><footer class="post-info">
-<span class="label">Date</span>
-<abbr class="published" title="2013-06-05T15:50:00">
-        <i class="icon-calendar"></i>Wed 05 June 2013
-</abbr>
-<span class="label">By</span>
-<a href="/author/djjsindy.html"><i class="icon-user"></i>djjsindy</a>
-<span class="label">Category</span>
-<a href="/category/nginx.html"><i class="icon-folder-open"></i>nginx</a>.
-
-
-<span class="label">Tags</span>
-	<a href="/tag/nginx.html"><i class="icon-tag"></i>nginx</a>
-</footer><!-- /.post-info --></div>
-                <div class="summary"><p>nginx解析配置文件，将解析出来得配置存放在<code>ngx_cycle_s</code>的<code>conf_ctx</code>中，<code>conf_ctx</code>是个四级指针，因为保存这些配置需要context，而这些context是有层级关系</p>
-                        <a class="btn primary xsmall" href="/nginx-init.html">more ...</a>
-                </div>
-        </div>
-        <hr />
-
-        </div><!--/span-->
-
-                <div class="span3 well sidebar-nav" id="sidebar">
-<ul class="nav nav-list">
-<li class="nav-header"><h4><i class="icon-external-link"></i>blogroll</h4></li>
-    <li><a href="djjsindy.blog.chinaunix.net"><i class="icon-external-link"></i>djjsindy-chinaunix</a></li>
-    <li><a href="http://nginx.org/"><i class="icon-external-link"></i>nginx</a></li>
-
-<li class="nav-header"><h4><i class="icon-folder-close icon-large"></i>Categories</h4></li>
-<li>
-<a href="/category/nginx.html">
-    <i class="icon-folder-open icon-large"></i>nginx
-</a>
-</li>
-<li>
-<a href="/category/ptmalloc.html">
-    <i class="icon-folder-open icon-large"></i>ptmalloc
-</a>
-</li>
-<li>
-<a href="/category/tomcat.html">
-    <i class="icon-folder-open icon-large"></i>tomcat
-</a>
-</li>
-
-<li class="nav-header"><h4><i class="icon-tags icon-large"></i>Tags</h4></li>
-<li class="tag-4">
-    <a href="/tag/ptmalloc.html">
-        <i class="icon-tag icon-large"></i>ptmalloc
-    </a>
-</li>
-<li class="tag-2">
-    <a href="/tag/tomcat.html">
-        <i class="icon-tag icon-large"></i>tomcat
-    </a>
-</li>
-<li class="tag-1">
-    <a href="/tag/nginx.html">
-        <i class="icon-tag icon-large"></i>nginx
-    </a>
-</li>
-
-
-</ul>        </div><!--/.well -->
-
-      </div><!--/row-->
-
-      <hr>
-
-      <footer>
-        <address id="about">
-                Proudly powered by <a href="http://pelican.notmyidea.org/">Pelican <i class="icon-external-link"></i></a>,
-                                which takes great advantage of <a href="http://python.org">Python <i class="icon-external-link"></i></a>.
-        </address><!-- /#about -->
-
-        <p>The theme is from <a href="http://twitter.github.com/bootstrap/">Bootstrap from Twitter <i class="icon-external-link"></i></a>,
-                   and <a href="http://fortawesome.github.com/Font-Awesome/">Font-Awesome <i class="icon-external-link"></i></a>, thanks!</p>
-      </footer>
-
-    </div><!--/.fluid-container-->
-
-
-<script type="text/javascript">
-var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
-document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
-</script>
-<script type="text/javascript">
-try {
-	var pageTracker = _gat._getTracker("UA-43260693-1");
-pageTracker._trackPageview();
-} catch(err) {}</script>
-
-    <!-- Le javascript -->
-    <!-- Placed at the end of the document so the pages load faster -->
-    <script src="/theme/js/jquery-1.7.2.min.js"></script>
-    <script src="/theme/js/bootstrap.min.js"></script>
-  </body>
+	</div>
+</body>
 </html>
