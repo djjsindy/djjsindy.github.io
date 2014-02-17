@@ -53,12 +53,34 @@
 	  <div class="content">
 <div class="page-header"><h1>djjsindy <small>ptmalloc</small></h1></div>
 <div class='article'>
-	<h2>ptmalloc中的fastbin chunk的合并过程</h2>
-	<div class="well small">Permalink: <a class="more" href="/ptmalloc.html">2014-02-17 10:04:00</a>
+	<h2>malloc_chunk边界标记法</h2>
+	<div class="well small">Permalink: <a class="more" href="/malloc_chunkbian-jie-biao-ji-fa.html">2014-02-17 10:04:00</a>
 by <a class="url fn" href="/author/djjsindy.html">djjsindy </a>
  in <a href="/category/ptmalloc.html">ptmalloc</a>
 tags: <a href="/tag/ptmalloc.html">ptmalloc</a> </div>
-	<div class="summary"><p>最近在设计一个memcache协议队列的内存管理模块，其实<code>malloc</code>和<code>free</code>并不是想象中的那种，<code>malloc</code>完空间<code>free</code>就会马上把内存返回给操作系统，所以了解一下glibc 中malloc和free函数的实现是十分必要的。了解了glibc中<code>malloc</code>实现原理对于设计一个自己的内存管理模块是十分有意义的，可以从中学到很多的优良设计。</p> <a class="btn primary xsmall" href="/ptmalloc.html">more…</a>
+	<div class="summary"><h1>malloc_chunk边界标记法和空间复用</h1>
+<h3>边界标记法</h3>
+<p>&nbsp;&nbsp;&nbsp;&nbsp;ptmalloc分配的空间统一用了<code>malloc_chunk</code>结构来管理，<code>malloc_chunk</code>的结构初看比较奇葩，看了注释，分析了一段时间的代码，发现这种边界标记的设计，在<code>malloc_chunk</code>虚拟地址都是彼此相邻的情况下，是十分高效的。</p>
+<p>malloc_chunk结构：</p>
+<pre><code>
+struct malloc_chunk {
+
+  INTERNAL_SIZE_T      prev_size;  /* Size of previous chunk (if free).  */
+  INTERNAL_SIZE_T      size;       /* Size in bytes, including overhead. */ //整个结构体的大小，包括结构体数据和后面可用的空间的大小
+
+  struct malloc_chunk* fd;         /* double links -- used only if free. */
+  struct malloc_chunk* bk;
+
+  /* Only used for large ...</code></pre> <a class="btn primary xsmall" href="/malloc_chunkbian-jie-biao-ji-fa.html">more…</a>
+	</div>
+</div>	
+<div class='article'>
+	<h2>ptmalloc中的fastbin chunk的合并过程</h2>
+	<div class="well small">Permalink: <a class="more" href="/ptmalloczhong-de-fastbin-chunkde-he-bing-guo-cheng.html">2014-02-17 10:04:00</a>
+by <a class="url fn" href="/author/djjsindy.html">djjsindy </a>
+ in <a href="/category/ptmalloc.html">ptmalloc</a>
+tags: <a href="/tag/ptmalloc.html">ptmalloc</a> </div>
+	<div class="summary"><p>最近在设计一个memcache协议队列的内存管理模块，其实<code>malloc</code>和<code>free</code>并不是想象中的那种，<code>malloc</code>完空间<code>free</code>就会马上把内存返回给操作系统，所以了解一下glibc 中malloc和free函数的实现是十分必要的。了解了glibc中<code>malloc</code>实现原理对于设计一个自己的内存管理模块是十分有意义的，可以从中学到很多的优良设计。</p> <a class="btn primary xsmall" href="/ptmalloczhong-de-fastbin-chunkde-he-bing-guo-cheng.html">more…</a>
 	</div>
 </div>	
 
