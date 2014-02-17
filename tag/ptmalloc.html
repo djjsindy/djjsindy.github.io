@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>djjsindy</title>
+    <title>djjsindy - ptmalloc</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="">
     <meta name="author" content="djjsindy">
@@ -94,28 +94,28 @@
     <div class="container-fluid">
       <div class="row">
         <div class="span9" id="content">
-<section id="content">
-<h1>Archives for djjsindy</h1>
+        <div class="article">
+                <h1><a href="/ptmalloc.html">ptmalloc中的fastbin chunk的合并过程</a></h1>
+                <div class="well small"><footer class="post-info">
+<span class="label">Date</span>
+<abbr class="published" title="2014-02-17T10:04:00">
+        <i class="icon-calendar"></i>Mon 17 February 2014
+</abbr>
+<span class="label">By</span>
+<a href="/author/djjsindy.html"><i class="icon-user"></i>djjsindy</a>
+<span class="label">Category</span>
+<a href="/category/ptmalloc.html"><i class="icon-folder-open"></i>ptmalloc</a>.
 
-<dl>
-	<dt>Mon 17 February 2014</dt>
-	<dd><a href='ptmalloc.html'>ptmalloc中的fastbin chunk的合并过程</a></dd>
-	<dt>Thu 08 August 2013</dt>
-	<dd><a href='nginx-pointer.html'>图解Nginx 中的4级指针</a></dd>
-	<dt>Fri 19 July 2013</dt>
-	<dd><a href='tomcat-output-buffer.html'>tomcat output buffer</a></dd>
-	<dt>Wed 17 July 2013</dt>
-	<dd><a href='tomcat-async.html'>tomcat的异步servlet处理</a></dd>
-	<dt>Wed 26 June 2013</dt>
-	<dd><a href='nginx-header-buf.html'>nginx request buf</a></dd>
-	<dt>Tue 18 June 2013</dt>
-	<dd><a href='nginx-hash.html'>nginx hash结构存储</a></dd>
-	<dt>Fri 07 June 2013</dt>
-	<dd><a href='nginx-static-location-tree.html'>nginx static location tree</a></dd>
-	<dt>Wed 05 June 2013</dt>
-	<dd><a href='nginx-init.html'>nginx配置初始化过程</a></dd>
-</dl>
-</section>
+
+<span class="label">Tags</span>
+	<a href="/tag/ptmalloc.html"><i class="icon-tag"></i>ptmalloc</a>
+</footer><!-- /.post-info --></div>
+                <div class="summary"><p>最近在设计一个memcache协议队列的内存管理模块，其实<code>malloc</code>和<code>free</code>并不是想象中的那种，<code>malloc</code>完空间<code>free</code>就会马上把内存返回给操作系统，所以了解一下glibc 中malloc和free函数的实现是十分必要的。了解了glibc中<code>malloc</code>实现原理对于设计一个自己的内存管理模块是十分有意义的，可以从中学到很多的优良设计。</p>
+                        <a class="btn primary xsmall" href="/ptmalloc.html">more ...</a>
+                </div>
+        </div>
+        <hr />
+
         </div><!--/span-->
 
                 <div class="span3 well sidebar-nav" id="sidebar">
