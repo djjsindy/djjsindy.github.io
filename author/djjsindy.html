@@ -17,6 +17,7 @@
 	<link href="/theme/pygments.css" rel="stylesheet">
 
     <!-- Feeds -->
+    <link href="/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="djjsindy Atom Feed" />
 
 <script>var _gaq=[['_setAccount','UA-43260693-1'],['_trackPageview']];(function(d,t){var g=d.createElement(t),s=d.getElementsByTagName(t)[0];g.src='//www.google-analytics.com/ga.js';s.parentNode.insertBefore(g,s)}(document,'script'))</script>
 </head>
@@ -28,6 +29,7 @@
 			<ul class="nav">
 					<li ><a href="/category/nginx.html">nginx</a></li>
 					<li ><a href="/category/ptmalloc.html">ptmalloc</a></li>
+					<li ><a href="/category/socket.html">socket</a></li>
 					<li ><a href="/category/tomcat.html">tomcat</a></li>
 			</ul>
 			<p class="pull-right"><a href="/archives.html">[archives]</a> <a href="/tags.html">[tags]</a></p>
@@ -52,6 +54,46 @@
 	  </div>
 	  <div class="content">
 <div class="page-header"><h1>djjsindy <small>djjsindy</small></h1></div>
+<div class='article'>
+	<h2>socket创建流程1</h2>
+	<div class="well small">Permalink: <a class="more" href="/socketchuang-jian-liu-cheng-1.html">2014-05-09 10:49:00</a>
+by <a class="url fn" href="/author/djjsindy.html">djjsindy </a>
+ in <a href="/category/socket.html">socket</a>
+tags: <a href="/tag/socket.html">socket</a> </div>
+	<div class="summary"><h1>socket创建流程1</h1>
+<p>linux内核在系统初始化的过程中，会对支持的多个协议组进行初始化，例如ipv4，ipv6，unix域协议。这些协议的结构体通过<code>sock_register</code>放在一个<code>net_families</code>的数组中。</p>
+<p><img src="https://lh5.googleusercontent.com/-fdHJThfthJ0/U2tXrsCfNjI/AAAAAAAAAPk/xtrusNqcVis/s1024/Screen%2520Shot%25202014-05-08%2520at%25206.07.45%2520PM.png" width="600"></p>
+<p>linux内核在初始化过程中，会调用inet_init函数，前半部分重要的代码：</p>
+<p>net/ipv4/af_inet.c</p>
+<p><pre><code><br />
+    (void)sock_register(&amp;inet_family_ops);  //该回调函数注册inet_family_ops
+    #ifdef CONFIG_SYSCTL
+    ip_static_sysctl_init();      <br />
+    #endif   //以下注册网络层到  <br />
+    if (inet_add_protocol(&amp;icmp_protocol, IPPROTO_ICMP) &lt; 0)
+        printk(KERN_CRIT "inet_init: Cannot add ICMP protocol\n");
+    if (inet_add_protocol(&amp;udp_protocol, IPPROTO_UDP) &lt; 0)
+        printk(KERN_CRIT "inet_init: Cannot add ...</code></pre></p> <a class="btn primary xsmall" href="/socketchuang-jian-liu-cheng-1.html">more…</a>
+	</div>
+</div>	
+<div class='article'>
+	<h2>ptmalloc free过程</h2>
+	<div class="well small">Permalink: <a class="more" href="/ptmalloc-freeguo-cheng.html">2014-02-21 16:34:00</a>
+by <a class="url fn" href="/author/djjsindy.html">djjsindy </a>
+ in <a href="/category/ptmalloc.html">ptmalloc</a>
+tags: <a href="/tag/ptmalloc.html">ptmalloc</a> </div>
+	<div class="summary"><h1>ptmalloc free过程</h1>
+<p>&nbsp;&nbsp;&nbsp;&nbsp;ptmalloc free函数并不是直接释放占用的空间给操作系统，在一些情况下才会释放给操作系统。</p>
+<ol>
+<li>释放的<code>malloc_chunk</code>中的空间是由mmap函数分配的，那么free的时候直接调用unmmap函数返还给操作系统。</li>
+<li>释放的<code>malloc_chunk</code>经过虚拟地址相邻空闲的进行合并，最后合并后的size&gt;<code>FASTBIN_CONSOLIDATION_THRESHOLD</code>，并且top chunk的size&gt;trim_threshold，这时就可以收缩top chunk了。</li>
+</ol>
+<p>&nbsp;&nbsp;&nbsp;&nbsp;从上面的情况可以看出，第一种调整mmap_threshold的大小，使得大于mmap_threshold的malloc请求都去使用mmap分配内存，同时释放的时候，直接unmmap返回给操作系统，如果这个值调的很大，会导致内存长期不回收。如果设置的太小，导致malloc中缓存的chunk会过少，malloc会多次调用mmap函数。第二种情况<code>FASTBIN_CONSOLIDATION_THRESHOLD</code>固定位64k，trim_threshold能通过mallopt函数进行设定。</p>
+<p>free函数的整体流程：
+<img src="https://lh6.googleusercontent.com/-elZ4iYV1BJo/UwMdA7Vf1qI/AAAAAAAAAOg/wdkkhUXN2xk/s640/Screen%2520Shot%25202014-02-18%2520at%25204.42.12%2520PM.png"/></p>
+<p>&nbsp;&nbsp;&nbsp;&nbsp;这里说一下最后的内存回收过程，如果当前分配的是main area，那么当回收的chunk经过合并最后的size大于<code>FASTBIN_CONSOLIDATION_THRESHOLD</code>，并且top chunk的大小大于trim_threshold，就对top chunk的内存进行回收，因为这种chunk分配内存都是通过sbrk，brk函数，而brk函数进行回收内存，调整指针，只能从分配的最顶处进行调整，不能从中间开始，如果能任意调整brk ...</p> <a class="btn primary xsmall" href="/ptmalloc-freeguo-cheng.html">more…</a>
+	</div>
+</div>	
 <div class='article'>
 	<h2>malloc_chunk边界标记法</h2>
 	<div class="well small">Permalink: <a class="more" href="/malloc_chunkbian-jie-biao-ji-fa.html">2014-02-17 10:04:00</a>
@@ -137,16 +179,15 @@ tags: <a href="/tag/nginx.html">nginx</a> </div>
 	<div class="summary"><p>nginx在处理location的配置的时候，用到了一种三叉排序树，加速了通过request的url和location的映射速度。</p> <a class="btn primary xsmall" href="/nginx-static-location-tree.html">more…</a>
 	</div>
 </div>	
-<div class='article'>
-	<h2>nginx配置初始化过程</h2>
-	<div class="well small">Permalink: <a class="more" href="/nginx-init.html">2013-06-05 15:50:00</a>
-by <a class="url fn" href="/author/djjsindy.html">djjsindy </a>
- in <a href="/category/nginx.html">nginx</a>
-tags: <a href="/tag/nginx.html">nginx</a> </div>
-	<div class="summary"><p>nginx解析配置文件，将解析出来得配置存放在<code>ngx_cycle_s</code>的<code>conf_ctx</code>中，<code>conf_ctx</code>是个四级指针，因为保存这些配置需要context，而这些context是有层级关系</p> <a class="btn primary xsmall" href="/nginx-init.html">more…</a>
-	</div>
-</div>	
 
+<div class="pagination">
+<ul>
+		<li class="prev disabled"><a href="#">&larr; Previous</a></li>
+		<li class="active"><a href="/author/djjsindy.html">1</a></li>
+		<li class=""><a href="/author/djjsindy2.html">2</a></li>
+		<li class="next"><a href="/author/djjsindy2.html">Next &rarr;</a></li>
+</ul>
+</div>
 
 		<footer>
 		  <p>Powered by <a href="http://getpelican.com/">Pelican</a>. Theme based on <a href="http://twitter.github.com/bootstrap/">Twitter Bootstrap</a>.</p>
