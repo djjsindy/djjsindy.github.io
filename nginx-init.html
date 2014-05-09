@@ -1,63 +1,83 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-	<meta charset="utf-8">
-	<title>djjsindy</title>
-	<meta name="description" content="">
-	<meta name="author" content="djjsindy">
+<html lang="en-US">
+    <head>
+        <meta charset="utf-8"> 
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="author" content="djjsindy" />
+        <meta name="copyright" content="djjsindy" />
 
-	<!-- HTML5 shim, for IE6-8 support of HTML elements -->
-	<!--[if lt IE 9]>
-		<script src="/theme/html5.js"></script>
-	<![endif]-->
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
 
-	<!-- Styles -->
-	<link href="/theme/bootstrap.min.css" rel="stylesheet">
-	<link href="/theme/local.css" rel="stylesheet">
-	<link href="/theme/pygments.css" rel="stylesheet">
+<meta name="keywords" content="nginx, nginx, " />
 
-    <!-- Feeds -->
-    <link href="/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="djjsindy Atom Feed" />
+<meta property="og:title" content="nginx配置初始化过程 "/>
+<meta property="og:url" content="/nginx-init.html" />
+<meta property="og:description" content="nginx解析配置文件，将解析出来得配置存放在ngx_cycle_s的conf_ctx中，conf_ctx是个四级指针，因为保存这些配置需要context，而这些context是有层级关系" />
+<meta property="og:site_name" content="djjsindy" />
+<meta property="og:article:author" content="djjsindy" />
+<meta property="og:article:published_time" content="2013-06-05T15:50:00" />
+<meta name="twitter:title" content="nginx配置初始化过程 ">
+<meta name="twitter:description" content="nginx解析配置文件，将解析出来得配置存放在ngx_cycle_s的conf_ctx中，conf_ctx是个四级指针，因为保存这些配置需要context，而这些context是有层级关系">
 
-<script>var _gaq=[['_setAccount','UA-43260693-1'],['_trackPageview']];(function(d,t){var g=d.createElement(t),s=d.getElementsByTagName(t)[0];g.src='//www.google-analytics.com/ga.js';s.parentNode.insertBefore(g,s)}(document,'script'))</script>
-</head>
-<body>
-	<div class="topbar">
-	  <div class="topbar-inner">
-		<div class="container-fluid">
-		  <a class="brand" href="/">djjsindy</a>
-			<ul class="nav">
-					<li class="active"><a href="/category/nginx.html">nginx</a></li>
-					<li ><a href="/category/ptmalloc.html">ptmalloc</a></li>
-					<li ><a href="/category/socket.html">socket</a></li>
-					<li ><a href="/category/tomcat.html">tomcat</a></li>
-			</ul>
-			<p class="pull-right"><a href="/archives.html">[archives]</a> <a href="/tags.html">[tags]</a></p>
-		</div>
-	  </div>
-	</div>
+        <title>nginx配置初始化过程  · djjsindy
+</title>
+        <link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/css/bootstrap-combined.min.css" rel="stylesheet">
+        <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.css" rel="stylesheet">
+        <link rel="stylesheet" type="text/css" href="/theme/css/pygments.css" media="screen">
+        <link rel="stylesheet" type="text/css" href="/theme/tipuesearch/tipuesearch.css" media="screen">
+        <link rel="stylesheet" type="text/css" href="/theme/css/elegant.css" media="screen">
+        <link rel="stylesheet" type="text/css" href="/theme/css/custom.css" media="screen">
+        <link href="/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="djjsindy - Full Atom Feed" />
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-43260693-1', 'auto');
+    ga('send', 'pageview');
+</script>
+    </head>
+    <body>
+        <div id="content-sans-footer">
+        <div class="navbar navbar-static-top">
+            <div class="navbar-inner">
+                <div class="container">
+                    <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </a>
+                    <a class="brand" href="/"><span class=site-name>djjsindy</span></a>
+                    <div class="nav-collapse collapse">
+                        <ul class="nav pull-right top-menu">
+                            <li ><a href="">Home</a></li>
+                            <li ><a href="/categories.html">Categories</a></li>
+                            <li ><a href="/tags.html">Tags</a></li>
+                            <li ><a href="/archives.html">Archives</a></li>
+                            <li><form class="navbar-search" action="/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="container-fluid">
+            <div class="row-fluid">
+                <div class="span1"></div>
+                <div class="span10">
+<article>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+    <h1><a href="/nginx-init.html"> nginx配置初始化过程  </a></h1>
+    </header>
+</div>
 
-	<div class="container-fluid">
-	  <div class="sidebar">
-		<div class="well">
-			<h3>Blogroll</h3>
-			<ul>
-			</ul>
-			<div class="social">
-			<h3>Social</h3>
-			<ul>
-			</ul>
-			</div>
-		</div>
-	  </div>
-	  <div class="content">
-	<div class='article'>
-		<div class="page-header"><h1>nginx配置初始化过程</h1></div>
-		<div class="well small">Permalink: <a class="more" href="/nginx-init.html">2013-06-05 15:50:00</a>
-by <a class="url fn" href="/author/djjsindy.html">djjsindy </a>
- in <a href="/category/nginx.html">nginx</a>
-tags: <a href="/tag/nginx.html">nginx</a> </div>
-		<div><p>nginx解析配置文件，将解析出来得配置存放在<code>ngx_cycle_s</code>的<code>conf_ctx</code>中，<code>conf_ctx</code>是个四级指针，因为保存这些配置需要context，而这些context是有层级关系，最终的配置结构如图：</p>
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+
+            
+            <p>nginx解析配置文件，将解析出来得配置存放在<code>ngx_cycle_s</code>的<code>conf_ctx</code>中，<code>conf_ctx</code>是个四级指针，因为保存这些配置需要context，而这些context是有层级关系，最终的配置结构如图：</p>
 <p><img alt="alt" src="https://lh6.googleusercontent.com/-3mkLLP0KDo0/Uhy8LX3gdoI/AAAAAAAAAL8/XuHLZ_VAiL8/s512/27767798_1370416906jegE.png" /></p>
 <p>http模块的配置有些复杂，由于server的配置还可以出现在http模块中，同时location的配置可以出现在http模块或者server模块中，所以对于http来说也就是最上面的那个<code>ngx_http_ctx_conf_t</code>有srv_conf和loc_conf是十分有必要的，这两个指针后面的结构体数组保存了在http中的那些server的和location的配置。同样对于每个server来说，不需要单独的main配置了，直接引用main的就可以。每个server必须有自己单独的<code>ngx_http_core_srv_conf_t</code>，来保存当前server块内的配置，这个配置最后会和http的里面的<code>ngx_http_core_srv_conf_t</code>做merge，这个merge是把父server的配置merge到子server配置上面。对于location的配置，在http和server中都可以配置，那么merge的操作需要首先把http的location配置merge到每个server配置中，然后每个server的location配置再和每个location模块中的配置进行merge，这里location配置需要merge两次。举例<code>ngx_http_core_module</code>模块merge的过程：</p>
 <p><img alt="alt" src="https://lh3.googleusercontent.com/-DbfydqnOWbA/Uhy8LacRRmI/AAAAAAAAAL8/MkKuUWW1Xbk/s576/27767798_1370417515HdmN.png" /></p>
@@ -157,17 +177,50 @@ tags: <a href="/tag/nginx.html">nginx</a> </div>
         <span class="k">return</span> <span class="n">rv</span><span class="p">;</span>
     <span class="p">}</span>
 <span class="p">}</span>
-</pre></div></div>
-		<div>
-			<h2>Comments</h2>
-		<div>
-	</div>	
-		<footer>
-		  <p>Powered by <a href="http://getpelican.com/">Pelican</a>. Theme based on <a href="http://twitter.github.com/bootstrap/">Twitter Bootstrap</a>.</p>
-		  <p>&copy; djjsindy</p>
-		</footer>
-	  </div>
+</pre></div>
+            
+            
+            <hr/>
+        </div>
+        <section>
+        <div class="span2" style="float:right;font-size:0.9em;">
+            <h4>Published</h4>
+            <time pubdate="pubdate" datetime="2013-06-05T15:50:00">Jun 5, 2013</time>
+            <h4>Category</h4>
+            <a class="category-link" href="/categories.html#nginx-ref">nginx</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="/tags.html#nginx-ref">nginx
+                    <span>5</span>
+</a></li>
+            </ul>
+        </div>
+        </section>
+</div>
+</article>
+                </div>
+                <div class="span1"></div>
+            </div>
+        </div>
+        <div id="push"></div>
+    </div>
+<footer>
+<div id="footer">
+    <ul class="footer-content">
+        <li class="elegant-power">Powered by <a href="http://getpelican.com/" title="Pelican Home Page">Pelican</a>. Theme: <a href="http://oncrashreboot.com/pelican-elegant" title="Theme Elegant Home Page">Elegant</a> by <a href="http://oncrashreboot.com" title="Talha Mansoor Home Page">Talha Mansoor</a></li>
+    </ul>
+</div>
+</footer>            <script src="http://code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
 
-	</div>
-</body>
+    
+    </body>
+    <!-- Theme: Elegant built for Pelican
+    License : http://oncrashreboot.com/pelican-elegant -->
 </html>

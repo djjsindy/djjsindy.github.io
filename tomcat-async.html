@@ -1,63 +1,83 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-	<meta charset="utf-8">
-	<title>djjsindy</title>
-	<meta name="description" content="">
-	<meta name="author" content="djjsindy">
+<html lang="en-US">
+    <head>
+        <meta charset="utf-8"> 
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="author" content="djjsindy" />
+        <meta name="copyright" content="djjsindy" />
 
-	<!-- HTML5 shim, for IE6-8 support of HTML elements -->
-	<!--[if lt IE 9]>
-		<script src="/theme/html5.js"></script>
-	<![endif]-->
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
 
-	<!-- Styles -->
-	<link href="/theme/bootstrap.min.css" rel="stylesheet">
-	<link href="/theme/local.css" rel="stylesheet">
-	<link href="/theme/pygments.css" rel="stylesheet">
+<meta name="keywords" content="tomcat, tomcat, " />
 
-    <!-- Feeds -->
-    <link href="/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="djjsindy Atom Feed" />
+<meta property="og:title" content="tomcat的异步servlet处理 "/>
+<meta property="og:url" content="/tomcat-async.html" />
+<meta property="og:description" content="这个是以前看的，由于最近工作中用到异步servlet，看了一下tomcat在对servlet3.0中AsyncContext的实现过程，总结一下，使用异步servlet主要原因就是因为，在service方法中业务逻辑如果碰到io操作时间比较长的操作，这样这个service方法就会长时间占用tomcat容器线程池中的线程，这样是不利于其他请求的处理的，当线程池中的线程处理任务时，任务由于长时间io操作，肯定会阻塞线程处理其他任务，引入异步servlet的目的就是将容器线程池和业务线程池分离开。在处理大io的业务操作的时候，把这个操作移动到业务线程池中进行，释放容器线程，使得容器线程处理其他任务，在业务逻辑执行完毕之后，然后在通知tomcat容器线程池来继续后面的操作，这个操作应该是把处理结果commit到客户端或者是dispatch到其他servlet上。" />
+<meta property="og:site_name" content="djjsindy" />
+<meta property="og:article:author" content="djjsindy" />
+<meta property="og:article:published_time" content="2013-07-17T12:02:00" />
+<meta name="twitter:title" content="tomcat的异步servlet处理 ">
+<meta name="twitter:description" content="这个是以前看的，由于最近工作中用到异步servlet，看了一下tomcat在对servlet3.0中AsyncContext的实现过程，总结一下，使用异步servlet主要原因就是因为，在service方法中业务逻辑如果碰到io操作时间比较长的操作，这样这个service方法就会长时间占用tomcat容器线程池中的线程，这样是不利于其他请求的处理的，当线程池中的线程处理任务时，任务由于长时间io操作，肯定会阻塞线程处理其他任务，引入异步servlet的目的就是将容器线程池和业务线程池分离开。在处理大io的业务操作的时候，把这个操作移动到业务线程池中进行，释放容器线程，使得容器线程处理其他任务，在业务逻辑执行完毕之后，然后在通知tomcat容器线程池来继续后面的操作，这个操作应该是把处理结果commit到客户端或者是dispatch到其他servlet上。">
 
-<script>var _gaq=[['_setAccount','UA-43260693-1'],['_trackPageview']];(function(d,t){var g=d.createElement(t),s=d.getElementsByTagName(t)[0];g.src='//www.google-analytics.com/ga.js';s.parentNode.insertBefore(g,s)}(document,'script'))</script>
-</head>
-<body>
-	<div class="topbar">
-	  <div class="topbar-inner">
-		<div class="container-fluid">
-		  <a class="brand" href="/">djjsindy</a>
-			<ul class="nav">
-					<li ><a href="/category/nginx.html">nginx</a></li>
-					<li ><a href="/category/ptmalloc.html">ptmalloc</a></li>
-					<li ><a href="/category/socket.html">socket</a></li>
-					<li class="active"><a href="/category/tomcat.html">tomcat</a></li>
-			</ul>
-			<p class="pull-right"><a href="/archives.html">[archives]</a> <a href="/tags.html">[tags]</a></p>
-		</div>
-	  </div>
-	</div>
+        <title>tomcat的异步servlet处理  · djjsindy
+</title>
+        <link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/css/bootstrap-combined.min.css" rel="stylesheet">
+        <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.css" rel="stylesheet">
+        <link rel="stylesheet" type="text/css" href="/theme/css/pygments.css" media="screen">
+        <link rel="stylesheet" type="text/css" href="/theme/tipuesearch/tipuesearch.css" media="screen">
+        <link rel="stylesheet" type="text/css" href="/theme/css/elegant.css" media="screen">
+        <link rel="stylesheet" type="text/css" href="/theme/css/custom.css" media="screen">
+        <link href="/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="djjsindy - Full Atom Feed" />
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-43260693-1', 'auto');
+    ga('send', 'pageview');
+</script>
+    </head>
+    <body>
+        <div id="content-sans-footer">
+        <div class="navbar navbar-static-top">
+            <div class="navbar-inner">
+                <div class="container">
+                    <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </a>
+                    <a class="brand" href="/"><span class=site-name>djjsindy</span></a>
+                    <div class="nav-collapse collapse">
+                        <ul class="nav pull-right top-menu">
+                            <li ><a href="">Home</a></li>
+                            <li ><a href="/categories.html">Categories</a></li>
+                            <li ><a href="/tags.html">Tags</a></li>
+                            <li ><a href="/archives.html">Archives</a></li>
+                            <li><form class="navbar-search" action="/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="container-fluid">
+            <div class="row-fluid">
+                <div class="span1"></div>
+                <div class="span10">
+<article>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+    <h1><a href="/tomcat-async.html"> tomcat的异步servlet处理  </a></h1>
+    </header>
+</div>
 
-	<div class="container-fluid">
-	  <div class="sidebar">
-		<div class="well">
-			<h3>Blogroll</h3>
-			<ul>
-			</ul>
-			<div class="social">
-			<h3>Social</h3>
-			<ul>
-			</ul>
-			</div>
-		</div>
-	  </div>
-	  <div class="content">
-	<div class='article'>
-		<div class="page-header"><h1>tomcat的异步servlet处理</h1></div>
-		<div class="well small">Permalink: <a class="more" href="/tomcat-async.html">2013-07-17 12:02:00</a>
-by <a class="url fn" href="/author/djjsindy.html">djjsindy </a>
- in <a href="/category/tomcat.html">tomcat</a>
-tags: <a href="/tag/tomcat.html">tomcat</a> </div>
-		<div><p>这个是以前看的，由于最近工作中用到异步servlet，看了一下tomcat在对servlet3.0中<code>AsyncContext</code>的实现过程，总结一下，使用异步servlet主要原因就是因为，在service方法中业务逻辑如果碰到io操作时间比较长的操作，这样这个service方法就会长时间占用tomcat容器线程池中的线程，这样是不利于其他请求的处理的，当线程池中的线程处理任务时，任务由于长时间io操作，肯定会阻塞线程处理其他任务，引入异步servlet的目的就是将容器线程池和业务线程池分离开。在处理大io的业务操作的时候，把这个操作移动到业务线程池中进行，释放容器线程，使得容器线程处理其他任务，在业务逻辑执行完毕之后，然后在通知tomcat容器线程池来继续后面的操作，这个操作应该是把处理结果commit到客户端或者是dispatch到其他servlet上。
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+
+            
+            <p>这个是以前看的，由于最近工作中用到异步servlet，看了一下tomcat在对servlet3.0中<code>AsyncContext</code>的实现过程，总结一下，使用异步servlet主要原因就是因为，在service方法中业务逻辑如果碰到io操作时间比较长的操作，这样这个service方法就会长时间占用tomcat容器线程池中的线程，这样是不利于其他请求的处理的，当线程池中的线程处理任务时，任务由于长时间io操作，肯定会阻塞线程处理其他任务，引入异步servlet的目的就是将容器线程池和业务线程池分离开。在处理大io的业务操作的时候，把这个操作移动到业务线程池中进行，释放容器线程，使得容器线程处理其他任务，在业务逻辑执行完毕之后，然后在通知tomcat容器线程池来继续后面的操作，这个操作应该是把处理结果commit到客户端或者是dispatch到其他servlet上。
 <img alt="Alt text" src="https://lh4.googleusercontent.com/-NNjNxSYLdCA/UhCB_tLhmPI/AAAAAAAAABk/GalwMQ-zXrM/s512/Screen%2520Shot%25202013-07-17%2520at%252011.40.30%2520AM.png" /></p>
 <p>上图是原始servlet和容器线程池的模型，下图是异步servlet，容器线程池和业务线程池的模型，从图中可以看出，原始模型在处理业务逻辑的过程中会一直占有容器线程池，而异步servlet模型，可以看出在业务线程池处理的过程中，有一段时间容器线程池中的那个线程是空闲的，这种设计大大提高了容器的处理请求的能力。</p>
 <p>异步servlet的开启在service中开启，对于一般请求，在service方法之后，都会commit response结果到客户端，但是在异步servlet中这个commit是没有意义的，因为输出还没产生，在业务线程池中还未处理完毕，这时需要把当前处理环境保存起来，以便业务线程池处理完毕后，再次找到这个处理环境继续处理。</p>
@@ -222,17 +242,50 @@ tags: <a href="/tag/tomcat.html">tomcat</a> </div>
                     <span class="n">filterChain</span><span class="p">.</span><span class="n">doFilter</span>
                         <span class="p">(</span><span class="n">request</span><span class="p">.</span><span class="n">getRequest</span><span class="p">(),</span> <span class="n">response</span><span class="p">.</span><span class="n">getResponse</span><span class="p">());</span>
                 <span class="p">}</span>
-</pre></div></div>
-		<div>
-			<h2>Comments</h2>
-		<div>
-	</div>	
-		<footer>
-		  <p>Powered by <a href="http://getpelican.com/">Pelican</a>. Theme based on <a href="http://twitter.github.com/bootstrap/">Twitter Bootstrap</a>.</p>
-		  <p>&copy; djjsindy</p>
-		</footer>
-	  </div>
+</pre></div>
+            
+            
+            <hr/>
+        </div>
+        <section>
+        <div class="span2" style="float:right;font-size:0.9em;">
+            <h4>Published</h4>
+            <time pubdate="pubdate" datetime="2013-07-17T12:02:00">Jul 17, 2013</time>
+            <h4>Category</h4>
+            <a class="category-link" href="/categories.html#tomcat-ref">tomcat</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="/tags.html#tomcat-ref">tomcat
+                    <span>2</span>
+</a></li>
+            </ul>
+        </div>
+        </section>
+</div>
+</article>
+                </div>
+                <div class="span1"></div>
+            </div>
+        </div>
+        <div id="push"></div>
+    </div>
+<footer>
+<div id="footer">
+    <ul class="footer-content">
+        <li class="elegant-power">Powered by <a href="http://getpelican.com/" title="Pelican Home Page">Pelican</a>. Theme: <a href="http://oncrashreboot.com/pelican-elegant" title="Theme Elegant Home Page">Elegant</a> by <a href="http://oncrashreboot.com" title="Talha Mansoor Home Page">Talha Mansoor</a></li>
+    </ul>
+</div>
+</footer>            <script src="http://code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
 
-	</div>
-</body>
+    
+    </body>
+    <!-- Theme: Elegant built for Pelican
+    License : http://oncrashreboot.com/pelican-elegant -->
 </html>

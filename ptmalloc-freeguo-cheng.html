@@ -1,63 +1,83 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-	<meta charset="utf-8">
-	<title>djjsindy</title>
-	<meta name="description" content="">
-	<meta name="author" content="djjsindy">
+<html lang="en-US">
+    <head>
+        <meta charset="utf-8"> 
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="author" content="djjsindy" />
+        <meta name="copyright" content="djjsindy" />
 
-	<!-- HTML5 shim, for IE6-8 support of HTML elements -->
-	<!--[if lt IE 9]>
-		<script src="/theme/html5.js"></script>
-	<![endif]-->
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
 
-	<!-- Styles -->
-	<link href="/theme/bootstrap.min.css" rel="stylesheet">
-	<link href="/theme/local.css" rel="stylesheet">
-	<link href="/theme/pygments.css" rel="stylesheet">
+<meta name="keywords" content="ptmalloc, ptmalloc, " />
 
-    <!-- Feeds -->
-    <link href="/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="djjsindy Atom Feed" />
+<meta property="og:title" content="ptmalloc free过程 "/>
+<meta property="og:url" content="/ptmalloc-freeguo-cheng.html" />
+<meta property="og:description" content="ptmalloc free函数并不是直接释放占用的空间给操作系统，在一些情况下才会释放给操作系统。" />
+<meta property="og:site_name" content="djjsindy" />
+<meta property="og:article:author" content="djjsindy" />
+<meta property="og:article:published_time" content="2014-02-21T16:34:00" />
+<meta name="twitter:title" content="ptmalloc free过程 ">
+<meta name="twitter:description" content="ptmalloc free函数并不是直接释放占用的空间给操作系统，在一些情况下才会释放给操作系统。">
 
-<script>var _gaq=[['_setAccount','UA-43260693-1'],['_trackPageview']];(function(d,t){var g=d.createElement(t),s=d.getElementsByTagName(t)[0];g.src='//www.google-analytics.com/ga.js';s.parentNode.insertBefore(g,s)}(document,'script'))</script>
-</head>
-<body>
-	<div class="topbar">
-	  <div class="topbar-inner">
-		<div class="container-fluid">
-		  <a class="brand" href="/">djjsindy</a>
-			<ul class="nav">
-					<li ><a href="/category/nginx.html">nginx</a></li>
-					<li class="active"><a href="/category/ptmalloc.html">ptmalloc</a></li>
-					<li ><a href="/category/socket.html">socket</a></li>
-					<li ><a href="/category/tomcat.html">tomcat</a></li>
-			</ul>
-			<p class="pull-right"><a href="/archives.html">[archives]</a> <a href="/tags.html">[tags]</a></p>
-		</div>
-	  </div>
-	</div>
+        <title>ptmalloc free过程  · djjsindy
+</title>
+        <link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/css/bootstrap-combined.min.css" rel="stylesheet">
+        <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.css" rel="stylesheet">
+        <link rel="stylesheet" type="text/css" href="/theme/css/pygments.css" media="screen">
+        <link rel="stylesheet" type="text/css" href="/theme/tipuesearch/tipuesearch.css" media="screen">
+        <link rel="stylesheet" type="text/css" href="/theme/css/elegant.css" media="screen">
+        <link rel="stylesheet" type="text/css" href="/theme/css/custom.css" media="screen">
+        <link href="/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="djjsindy - Full Atom Feed" />
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-43260693-1', 'auto');
+    ga('send', 'pageview');
+</script>
+    </head>
+    <body>
+        <div id="content-sans-footer">
+        <div class="navbar navbar-static-top">
+            <div class="navbar-inner">
+                <div class="container">
+                    <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </a>
+                    <a class="brand" href="/"><span class=site-name>djjsindy</span></a>
+                    <div class="nav-collapse collapse">
+                        <ul class="nav pull-right top-menu">
+                            <li ><a href="">Home</a></li>
+                            <li ><a href="/categories.html">Categories</a></li>
+                            <li ><a href="/tags.html">Tags</a></li>
+                            <li ><a href="/archives.html">Archives</a></li>
+                            <li><form class="navbar-search" action="/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="container-fluid">
+            <div class="row-fluid">
+                <div class="span1"></div>
+                <div class="span10">
+<article>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+    <h1><a href="/ptmalloc-freeguo-cheng.html"> ptmalloc free过程  </a></h1>
+    </header>
+</div>
 
-	<div class="container-fluid">
-	  <div class="sidebar">
-		<div class="well">
-			<h3>Blogroll</h3>
-			<ul>
-			</ul>
-			<div class="social">
-			<h3>Social</h3>
-			<ul>
-			</ul>
-			</div>
-		</div>
-	  </div>
-	  <div class="content">
-	<div class='article'>
-		<div class="page-header"><h1>ptmalloc free过程</h1></div>
-		<div class="well small">Permalink: <a class="more" href="/ptmalloc-freeguo-cheng.html">2014-02-21 16:34:00</a>
-by <a class="url fn" href="/author/djjsindy.html">djjsindy </a>
- in <a href="/category/ptmalloc.html">ptmalloc</a>
-tags: <a href="/tag/ptmalloc.html">ptmalloc</a> </div>
-		<div><h1>ptmalloc free过程</h1>
+<div class="row-fluid">
+        <div class="span8 offset2 article-content">
+
+            
+            <h1>ptmalloc free过程</h1>
 <p>&nbsp;&nbsp;&nbsp;&nbsp;ptmalloc free函数并不是直接释放占用的空间给操作系统，在一些情况下才会释放给操作系统。</p>
 <ol>
 <li>释放的<code>malloc_chunk</code>中的空间是由mmap函数分配的，那么free的时候直接调用unmmap函数返还给操作系统。</li>
@@ -66,17 +86,50 @@ tags: <a href="/tag/ptmalloc.html">ptmalloc</a> </div>
 <p>&nbsp;&nbsp;&nbsp;&nbsp;从上面的情况可以看出，第一种调整mmap_threshold的大小，使得大于mmap_threshold的malloc请求都去使用mmap分配内存，同时释放的时候，直接unmmap返回给操作系统，如果这个值调的很大，会导致内存长期不回收。如果设置的太小，导致malloc中缓存的chunk会过少，malloc会多次调用mmap函数。第二种情况<code>FASTBIN_CONSOLIDATION_THRESHOLD</code>固定位64k，trim_threshold能通过mallopt函数进行设定。</p>
 <p>free函数的整体流程：
 <img src="https://lh6.googleusercontent.com/-elZ4iYV1BJo/UwMdA7Vf1qI/AAAAAAAAAOg/wdkkhUXN2xk/s640/Screen%2520Shot%25202014-02-18%2520at%25204.42.12%2520PM.png"/></p>
-<p>&nbsp;&nbsp;&nbsp;&nbsp;这里说一下最后的内存回收过程，如果当前分配的是main area，那么当回收的chunk经过合并最后的size大于<code>FASTBIN_CONSOLIDATION_THRESHOLD</code>，并且top chunk的大小大于trim_threshold，就对top chunk的内存进行回收，因为这种chunk分配内存都是通过sbrk，brk函数，而brk函数进行回收内存，调整指针，只能从分配的最顶处进行调整，不能从中间开始，如果能任意调整brk，那么brk当前指针之上的空间，就没法处理了，所以只能调整top chunk，回收内存会调用systrim函数，如果是其他的area（关于area以后再讲），直接调用heap_trim函数。</p></div>
-		<div>
-			<h2>Comments</h2>
-		<div>
-	</div>	
-		<footer>
-		  <p>Powered by <a href="http://getpelican.com/">Pelican</a>. Theme based on <a href="http://twitter.github.com/bootstrap/">Twitter Bootstrap</a>.</p>
-		  <p>&copy; djjsindy</p>
-		</footer>
-	  </div>
+<p>&nbsp;&nbsp;&nbsp;&nbsp;这里说一下最后的内存回收过程，如果当前分配的是main area，那么当回收的chunk经过合并最后的size大于<code>FASTBIN_CONSOLIDATION_THRESHOLD</code>，并且top chunk的大小大于trim_threshold，就对top chunk的内存进行回收，因为这种chunk分配内存都是通过sbrk，brk函数，而brk函数进行回收内存，调整指针，只能从分配的最顶处进行调整，不能从中间开始，如果能任意调整brk，那么brk当前指针之上的空间，就没法处理了，所以只能调整top chunk，回收内存会调用systrim函数，如果是其他的area（关于area以后再讲），直接调用heap_trim函数。</p>
+            
+            
+            <hr/>
+        </div>
+        <section>
+        <div class="span2" style="float:right;font-size:0.9em;">
+            <h4>Published</h4>
+            <time pubdate="pubdate" datetime="2014-02-21T16:34:00">Feb 21, 2014</time>
+            <h4>Category</h4>
+            <a class="category-link" href="/categories.html#ptmalloc-ref">ptmalloc</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="/tags.html#ptmalloc-ref">ptmalloc
+                    <span>3</span>
+</a></li>
+            </ul>
+        </div>
+        </section>
+</div>
+</article>
+                </div>
+                <div class="span1"></div>
+            </div>
+        </div>
+        <div id="push"></div>
+    </div>
+<footer>
+<div id="footer">
+    <ul class="footer-content">
+        <li class="elegant-power">Powered by <a href="http://getpelican.com/" title="Pelican Home Page">Pelican</a>. Theme: <a href="http://oncrashreboot.com/pelican-elegant" title="Theme Elegant Home Page">Elegant</a> by <a href="http://oncrashreboot.com" title="Talha Mansoor Home Page">Talha Mansoor</a></li>
+    </ul>
+</div>
+</footer>            <script src="http://code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
 
-	</div>
-</body>
+    
+    </body>
+    <!-- Theme: Elegant built for Pelican
+    License : http://oncrashreboot.com/pelican-elegant -->
 </html>

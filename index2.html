@@ -1,82 +1,202 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-	<meta charset="utf-8">
-	<title>djjsindy</title>
-	<meta name="description" content="">
-	<meta name="author" content="djjsindy">
+<html lang="en-US">
+    <head>
+        <meta charset="utf-8"> 
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="author" content="djjsindy" />
+        <meta name="copyright" content="djjsindy" />
 
-	<!-- HTML5 shim, for IE6-8 support of HTML elements -->
-	<!--[if lt IE 9]>
-		<script src="/theme/html5.js"></script>
-	<![endif]-->
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
 
-	<!-- Styles -->
-	<link href="/theme/bootstrap.min.css" rel="stylesheet">
-	<link href="/theme/local.css" rel="stylesheet">
-	<link href="/theme/pygments.css" rel="stylesheet">
+<meta property="og:title" content="djjsindy"/>
+<meta name="twitter:title" content="djjsindy">
+<meta property="og:url" content="" />
+<meta property="og:site_name" content="djjsindy" />
+<meta property="og:article:author" content="djjsindy" />
+        <title>djjsindy
+</title>
+        <link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/css/bootstrap-combined.min.css" rel="stylesheet">
+        <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.css" rel="stylesheet">
+        <link rel="stylesheet" type="text/css" href="/theme/css/pygments.css" media="screen">
+        <link rel="stylesheet" type="text/css" href="/theme/tipuesearch/tipuesearch.css" media="screen">
+        <link rel="stylesheet" type="text/css" href="/theme/css/elegant.css" media="screen">
+        <link rel="stylesheet" type="text/css" href="/theme/css/custom.css" media="screen">
+        <link href="/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="djjsindy - Full Atom Feed" />
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    ga('create', 'UA-43260693-1', 'auto');
+    ga('send', 'pageview');
+</script>
+    </head>
+    <body>
+        <div id="content-sans-footer">
+        <div class="navbar navbar-static-top">
+            <div class="navbar-inner">
+                <div class="container">
+                    <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </a>
+                    <a class="brand" href="/"><span class=site-name>djjsindy</span></a>
+                    <div class="nav-collapse collapse">
+                        <ul class="nav pull-right top-menu">
+                            <li  class="active"><a href="">Home</a></li>
+                            <li ><a href="/categories.html">Categories</a></li>
+                            <li ><a href="/tags.html">Tags</a></li>
+                            <li ><a href="/archives.html">Archives</a></li>
+                            <li><form class="navbar-search" action="/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="container-fluid">
+            <div class="row-fluid">
+                <div class="span1"></div>
+                <div class="span10">
+<div class="row-fluid">
 
-    <!-- Feeds -->
-    <link href="/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="djjsindy Atom Feed" />
+    <div class="row-fluid">
 
-<script>var _gaq=[['_setAccount','UA-43260693-1'],['_trackPageview']];(function(d,t){var g=d.createElement(t),s=d.getElementsByTagName(t)[0];g.src='//www.google-analytics.com/ga.js';s.parentNode.insertBefore(g,s)}(document,'script'))</script>
-</head>
-<body>
-	<div class="topbar">
-	  <div class="topbar-inner">
-		<div class="container-fluid">
-		  <a class="brand" href="/">djjsindy</a>
-			<ul class="nav">
-					<li ><a href="/category/nginx.html">nginx</a></li>
-					<li ><a href="/category/ptmalloc.html">ptmalloc</a></li>
-					<li ><a href="/category/socket.html">socket</a></li>
-					<li ><a href="/category/tomcat.html">tomcat</a></li>
-			</ul>
-			<p class="pull-right"><a href="/archives.html">[archives]</a> <a href="/tags.html">[tags]</a></p>
-		</div>
-	  </div>
-	</div>
+    </div>
 
-	<div class="container-fluid">
-	  <div class="sidebar">
-		<div class="well">
-			<h3>Blogroll</h3>
-			<ul>
-			</ul>
-			<div class="social">
-			<h3>Social</h3>
-			<ul>
-			</ul>
-			</div>
-		</div>
-	  </div>
-	  <div class="content">
-<div class="page-header"><h1> djjsindy </h1></div>
-<div class='article'>
-	<h2>nginx配置初始化过程</h2>
-	<div class="well small">Permalink: <a class="more" href="/nginx-init.html">2013-06-05 15:50:00</a>
-by <a class="url fn" href="/author/djjsindy.html">djjsindy </a>
- in <a href="/category/nginx.html">nginx</a>
-tags: <a href="/tag/nginx.html">nginx</a> </div>
-	<div class="summary"><p>nginx解析配置文件，将解析出来得配置存放在<code>ngx_cycle_s</code>的<code>conf_ctx</code>中，<code>conf_ctx</code>是个四级指针，因为保存这些配置需要context，而这些context是有层级关系</p> <a class="btn primary xsmall" href="/nginx-init.html">more…</a>
-	</div>
-</div>	
-
-<div class="pagination">
-<ul>
-		<li class="prev"><a href="/index.html">&larr; Previous</a></li>
-		<li class=""><a href="/index.html">1</a></li>
-		<li class="active"><a href="/index2.html">2</a></li>
-		<li class="next disabled"><a href="#">&rarr; Next</a></li>
-</ul>
+    <div class="row-fluid">
+        <div class="span8 offset2">
+            <header>
+            <h1 id="recent-posts">Recent Posts <a id="allposts" href="/archives.html">all posts</a></h1>
+            </header>
+        <div class="recent-posts">
+            <article>
+                <a href="/socketchuang-jian-liu-cheng-1.html">socket创建流程1  </a>
+                <section>
+                    posted in
+                <a href="/categories.html#socket-ref">socket</a>
+                <div class="recent-posts-time">
+                <time pubdate="pubdate" datetime="2014-05-09T10:49:00">Fri 09 May 2014</time>
+                </div>
+                </section>
+            </article>
+            <article>
+                <a href="/ptmalloc-freeguo-cheng.html">ptmalloc free过程  </a>
+                <section>
+                    posted in
+                <a href="/categories.html#ptmalloc-ref">ptmalloc</a>
+                <div class="recent-posts-time">
+                <time pubdate="pubdate" datetime="2014-02-21T16:34:00">Fri 21 February 2014</time>
+                </div>
+                </section>
+            </article>
+            <article>
+                <a href="/malloc_chunkbian-jie-biao-ji-fa.html">malloc_chunk边界标记法  </a>
+                <section>
+                    posted in
+                <a href="/categories.html#ptmalloc-ref">ptmalloc</a>
+                <div class="recent-posts-time">
+                <time pubdate="pubdate" datetime="2014-02-17T10:04:00">Mon 17 February 2014</time>
+                </div>
+                </section>
+            </article>
+            <article>
+                <a href="/ptmalloczhong-de-fastbin-chunkde-he-bing-guo-cheng.html">ptmalloc中的fastbin chunk的合并过程  </a>
+                <section>
+                    posted in
+                <a href="/categories.html#ptmalloc-ref">ptmalloc</a>
+                <div class="recent-posts-time">
+                <time pubdate="pubdate" datetime="2014-02-17T10:04:00">Mon 17 February 2014</time>
+                </div>
+                </section>
+            </article>
+            <article>
+                <a href="/nginx-pointer.html">图解Nginx 中的4级指针  </a>
+                <section>
+                    posted in
+                <a href="/categories.html#nginx-ref">nginx</a>
+                <div class="recent-posts-time">
+                <time pubdate="pubdate" datetime="2013-08-08T22:45:00">Thu 08 August 2013</time>
+                </div>
+                </section>
+            </article>
+            <article>
+                <a href="/tomcat-output-buffer.html">tomcat output buffer  </a>
+                <section>
+                    posted in
+                <a href="/categories.html#tomcat-ref">tomcat</a>
+                <div class="recent-posts-time">
+                <time pubdate="pubdate" datetime="2013-07-19T15:32:00">Fri 19 July 2013</time>
+                </div>
+                </section>
+            </article>
+            <article>
+                <a href="/tomcat-async.html">tomcat的异步servlet处理  </a>
+                <section>
+                    posted in
+                <a href="/categories.html#tomcat-ref">tomcat</a>
+                <div class="recent-posts-time">
+                <time pubdate="pubdate" datetime="2013-07-17T12:02:00">Wed 17 July 2013</time>
+                </div>
+                </section>
+            </article>
+            <article>
+                <a href="/nginx-header-buf.html">nginx request buf  </a>
+                <section>
+                    posted in
+                <a href="/categories.html#nginx-ref">nginx</a>
+                <div class="recent-posts-time">
+                <time pubdate="pubdate" datetime="2013-06-26T15:45:00">Wed 26 June 2013</time>
+                </div>
+                </section>
+            </article>
+            <article>
+                <a href="/nginx-hash.html">nginx hash结构存储  </a>
+                <section>
+                    posted in
+                <a href="/categories.html#nginx-ref">nginx</a>
+                <div class="recent-posts-time">
+                <time pubdate="pubdate" datetime="2013-06-18T17:34:00">Tue 18 June 2013</time>
+                </div>
+                </section>
+            </article>
+            <article>
+                <a href="/nginx-static-location-tree.html">nginx static location tree  </a>
+                <section>
+                    posted in
+                <a href="/categories.html#nginx-ref">nginx</a>
+                <div class="recent-posts-time">
+                <time pubdate="pubdate" datetime="2013-06-07T23:56:00">Fri 07 June 2013</time>
+                </div>
+                </section>
+            </article>
+        </div>
+        </div>
+    </div>
 </div>
-
-		<footer>
-		  <p>Powered by <a href="http://getpelican.com/">Pelican</a>. Theme based on <a href="http://twitter.github.com/bootstrap/">Twitter Bootstrap</a>.</p>
-		  <p>&copy; djjsindy</p>
-		</footer>
-	  </div>
-
-	</div>
-</body>
+                </div>
+                <div class="span1"></div>
+            </div>
+        </div>
+        <div id="push"></div>
+    </div>
+<footer>
+<div id="footer">
+    <ul class="footer-content">
+        <li class="elegant-power">Powered by <a href="http://getpelican.com/" title="Pelican Home Page">Pelican</a>. Theme: <a href="http://oncrashreboot.com/pelican-elegant" title="Theme Elegant Home Page">Elegant</a> by <a href="http://oncrashreboot.com" title="Talha Mansoor Home Page">Talha Mansoor</a></li>
+    </ul>
+</div>
+</footer>        <script src="http://code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+    </body>
+    <!-- Theme: Elegant built for Pelican
+    License : http://oncrashreboot.com/pelican-elegant -->
 </html>
