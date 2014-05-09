@@ -60,20 +60,7 @@
 by <a class="url fn" href="/author/djjsindy.html">djjsindy </a>
  in <a href="/category/socket.html">socket</a>
 tags: <a href="/tag/socket.html">socket</a> </div>
-	<div class="summary"><h1>socket创建流程1</h1>
-<p>linux内核在系统初始化的过程中，会对支持的多个协议组进行初始化，例如ipv4，ipv6，unix域协议。这些协议的结构体通过<code>sock_register</code>放在一个<code>net_families</code>的数组中。</p>
-<p><img src="https://lh5.googleusercontent.com/-fdHJThfthJ0/U2tXrsCfNjI/AAAAAAAAAPk/xtrusNqcVis/s1024/Screen%2520Shot%25202014-05-08%2520at%25206.07.45%2520PM.png" width="600"></p>
-<p>linux内核在初始化过程中，会调用inet_init函数，前半部分重要的代码：</p>
-<p>net/ipv4/af_inet.c</p>
-<p><pre><code><br />
-    (void)sock_register(&amp;inet_family_ops);  //该回调函数注册inet_family_ops
-    #ifdef CONFIG_SYSCTL
-    ip_static_sysctl_init();      <br />
-    #endif   //以下注册网络层到  <br />
-    if (inet_add_protocol(&amp;icmp_protocol, IPPROTO_ICMP) &lt; 0)
-        printk(KERN_CRIT "inet_init: Cannot add ICMP protocol\n");
-    if (inet_add_protocol(&amp;udp_protocol, IPPROTO_UDP) &lt; 0)
-        printk(KERN_CRIT "inet_init: Cannot add ...</code></pre></p> <a class="btn primary xsmall" href="/socketchuang-jian-liu-cheng-1.html">more…</a>
+	<div class="summary"><p>socket创建流程1</p> <a class="btn primary xsmall" href="/socketchuang-jian-liu-cheng-1.html">more…</a>
 	</div>
 </div>	
 
