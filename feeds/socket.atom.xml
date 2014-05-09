@@ -36,81 +36,61 @@ static struct inet_protosw inetsw_array[] =
         .prot =       &amp;amp;tcp_prot,     //tcp的一些回调函数
         .ops =        &amp;amp;inet_stream_ops,  //字节流模式的回调函数
         .no_check =   0,
-        .flags =      INET_PROTOSW_PERMANENT |
-                  INET_PROTOSW_ICSK,
-    },&lt;/p&gt;
-&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="p"&gt;{&lt;/span&gt;
-    &lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;type&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt;       &lt;span class="n"&gt;SOCK_DGRAM&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
-    &lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;protocol&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt;   &lt;span class="n"&gt;IPPROTO_UDP&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
-    &lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;prot&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt;       &lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;udp_prot&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
-    &lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;ops&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt;        &lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;inet_dgram_ops&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
-    &lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;no_check&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt;   &lt;span class="n"&gt;UDP_CSUM_DEFAULT&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
-    &lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;flags&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt;      &lt;span class="n"&gt;INET_PROTOSW_PERMANENT&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
-   &lt;span class="p"&gt;},&lt;/span&gt;
-
-
-   &lt;span class="p"&gt;{&lt;/span&gt;
-       &lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;type&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt;       &lt;span class="n"&gt;SOCK_RAW&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
-       &lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;protocol&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt;   &lt;span class="n"&gt;IPPROTO_IP&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;    &lt;span class="cm"&gt;/* wild card */&lt;/span&gt;
-       &lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;prot&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt;       &lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;raw_prot&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
-       &lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;ops&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt;        &lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;inet_sockraw_ops&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
-       &lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;no_check&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt;   &lt;span class="n"&gt;UDP_CSUM_DEFAULT&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
-       &lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;flags&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt;      &lt;span class="n"&gt;INET_PROTOSW_REUSE&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
-   &lt;span class="p"&gt;}&lt;/span&gt;
-&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;p&gt;};
+        .flags =      INET_PROTOSW_PERMANENT |INET_PROTOSW_ICSK,
+    },
+    {
+        .type =       SOCK_DGRAM,
+        .protocol =   IPPROTO_UDP,
+        .prot =       &amp;amp;udp_prot,
+        .ops =        &amp;amp;inet_dgram_ops,
+        .no_check =   UDP_CSUM_DEFAULT,
+        .flags =      INET_PROTOSW_PERMANENT,
+    },
+    {
+        .type =       SOCK_RAW,
+        .protocol =   IPPROTO_IP,   /&lt;em&gt; wild card &lt;/em&gt;/
+        .prot =       &amp;amp;raw_prot,
+        .ops =        &amp;amp;inet_sockraw_ops,
+        .no_check =   UDP_CSUM_DEFAULT,
+        .flags =      INET_PROTOSW_REUSE,
+    }
+};
 &lt;/pre&gt;&lt;/code&gt;&lt;/p&gt;
 &lt;p&gt;所以对于对于经常写的代码&lt;code&gt;socket(AF_INET, SOCK_STREAM, 0);&lt;/code&gt;，创建socket结构，首先根据第一个参数&lt;code&gt;AF_INET&lt;/code&gt;，在&lt;code&gt;net_families&lt;/code&gt;数组中匹配到&lt;code&gt;inet_family_ops&lt;/code&gt;，再根据&lt;code&gt;inetsw_array&lt;/code&gt;数组中的type和protocol设置prot和ops指针，&lt;code&gt;inet_init&lt;/code&gt;后面的初始化暂时看不懂。&lt;/p&gt;
 &lt;p&gt;net/socket.c
 &lt;pre&gt;&lt;code&gt;
 pf = rcu_dereference(net_families[family]); 
 //根据family确定使用哪个family，AF_INET使用inet_family_ops
-    err = -EAFNOSUPPORT;
-    if (!pf)
-        goto out_release;&lt;/p&gt;
-&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="cm"&gt;/*&lt;/span&gt;
-&lt;span class="cm"&gt; * We will call the -&amp;gt;create function, that possibly is in a loadable&lt;/span&gt;
-&lt;span class="cm"&gt; * module, so we have to bump that loadable module refcnt first.&lt;/span&gt;
-&lt;span class="cm"&gt; */&lt;/span&gt;
-&lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;!&lt;/span&gt;&lt;span class="n"&gt;try_module_get&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;pf&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;owner&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt;
-    &lt;span class="n"&gt;goto&lt;/span&gt; &lt;span class="n"&gt;out_release&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-
-&lt;span class="cm"&gt;/* Now protected by module ref count */&lt;/span&gt;
-&lt;span class="n"&gt;rcu_read_unlock&lt;/span&gt;&lt;span class="p"&gt;();&lt;/span&gt;
-
-&lt;span class="n"&gt;err&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;pf&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;create&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;net&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;sock&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;protocol&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;kern&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt; &lt;span class="c1"&gt;//调用inet的create函数&lt;/span&gt;
-&lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;err&lt;/span&gt; &lt;span class="o"&gt;&amp;lt;&lt;/span&gt; &lt;span class="mh"&gt;0&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
-    &lt;span class="n"&gt;goto&lt;/span&gt; &lt;span class="n"&gt;out_module_put&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-&lt;/pre&gt;&lt;/div&gt;
-
-
+err = -EAFNOSUPPORT;
+if (!pf)
+    goto out_release;
+if (!try_module_get(pf-&amp;gt;owner))
+    goto out_release;
+rcu_read_unlock();
+err = pf-&amp;gt;create(net, sock, protocol, kern); //调用inet的create函数
+if (err &amp;lt; 0)
+    goto out_module_put;&lt;/p&gt;
 &lt;p&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/p&gt;
 &lt;p&gt;net/ipv4/af_inet.c
 &lt;pre&gt;&lt;code&gt;
 //根据type和protocol从inetsw_array选择合适的inet_protosw
-list_for_each_entry_rcu(answer, &amp;amp;inetsw[sock-&amp;gt;type], list) {&lt;/p&gt;
-&lt;div class="highlight"&gt;&lt;pre&gt;    &lt;span class="n"&gt;err&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-    &lt;span class="cm"&gt;/* Check the non-wild match. */&lt;/span&gt;
-    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;protocol&lt;/span&gt; &lt;span class="o"&gt;==&lt;/span&gt; &lt;span class="n"&gt;answer&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;protocol&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
-        &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;protocol&lt;/span&gt; &lt;span class="o"&gt;!=&lt;/span&gt; &lt;span class="n"&gt;IPPROTO_IP&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
-            &lt;span class="k"&gt;break&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-    &lt;span class="p"&gt;}&lt;/span&gt; &lt;span class="k"&gt;else&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
-        &lt;span class="cm"&gt;/* Check for the two wild cases. */&lt;/span&gt;
-        &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;IPPROTO_IP&lt;/span&gt; &lt;span class="o"&gt;==&lt;/span&gt; &lt;span class="n"&gt;protocol&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
-            &lt;span class="n"&gt;protocol&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;answer&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;protocol&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-            &lt;span class="k"&gt;break&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-        &lt;span class="p"&gt;}&lt;/span&gt;
-        &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;IPPROTO_IP&lt;/span&gt; &lt;span class="o"&gt;==&lt;/span&gt; &lt;span class="n"&gt;answer&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;protocol&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
-            &lt;span class="k"&gt;break&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-    &lt;span class="p"&gt;}&lt;/span&gt;
-    &lt;span class="n"&gt;err&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt;&lt;span class="n"&gt;EPROTONOSUPPORT&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-&lt;span class="p"&gt;}&lt;/span&gt;
-&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;p&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/p&gt;
+list_for_each_entry_rcu(answer, &amp;amp;inetsw[sock-&amp;gt;type], list) {
+        err = 0;
+        if (protocol == answer-&amp;gt;protocol) {
+            if (protocol != IPPROTO_IP)
+                break;
+        } else {
+            /&lt;em&gt; Check for the two wild cases. &lt;/em&gt;/
+            if (IPPROTO_IP == protocol) {
+                protocol = answer-&amp;gt;protocol;
+                break;
+            }
+            if (IPPROTO_IP == answer-&amp;gt;protocol)
+                break;
+        }
+        err = -EPROTONOSUPPORT;
+    }
+&lt;/code&gt;&lt;/pre&gt;&lt;/p&gt;
 &lt;p&gt;看下struct socket的结构&lt;/p&gt;
 &lt;p&gt;&lt;img src="https://lh6.googleusercontent.com/-ntSul2-gNTc/U2w7Sm1rPMI/AAAAAAAAAQE/OeK6SvuhXmU/s800/Screen%2520Shot%25202014-05-09%2520at%252010.16.33%2520AM.png" width="500"&gt;&lt;/p&gt;
 &lt;p&gt;可以看出struct socket的结构分为了2个部分，通过file连接底层驱动，sock记录tcp连接状态，proto_ops是各种操作函数的结构体，上面的代码选择出了protocol，那么对应到这图中，对struct socket中的proto_ops和sock_common中的skc_prot进行了赋值。这两个都是相关协议的回调函数接口。&lt;/p&gt;</summary><category term="socket"></category></entry></feed>
