@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>djjsindy - nginx</title>
+    <title>socket创建流程2</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="">
     <meta name="author" content="djjsindy">
@@ -64,7 +64,7 @@
           <div class="nav-collapse">
             <ul class="nav">
                           <li class="divider-vertical"></li>
-                  <li class="active">
+                  <li >
                     <a href="/category/nginx.html">
 						<i class="icon-folder-open icon-large"></i>nginx
 					</a>
@@ -74,7 +74,7 @@
 						<i class="icon-folder-open icon-large"></i>ptmalloc
 					</a>
                   </li>
-                  <li >
+                  <li class="active">
                     <a href="/category/socket.html">
 						<i class="icon-folder-open icon-large"></i>socket
 					</a>
@@ -99,112 +99,82 @@
     <div class="container-fluid">
       <div class="row">
         <div class="span9" id="content">
-        <div class="article">
-                <h1><a href="/nginx-pointer.html">图解Nginx 中的4级指针</a></h1>
-                <div class="well small"><footer class="post-info">
+<section id="content">
+        <article>
+                <header>
+                        <h1>
+                                <a href=""
+                                        rel="bookmark"
+                                        title="Permalink to socket创建流程2">
+                                        socket创建流程2
+                                </a>
+                        </h1>
+                </header>
+                <div class="entry-content">
+                <div class="well">
+<footer class="post-info">
 <span class="label">Date</span>
-<abbr class="published" title="2013-08-08T22:45:00">
-        <i class="icon-calendar"></i>Thu 08 August 2013
+<abbr class="published" title="2014-05-09T15:14:00">
+        <i class="icon-calendar"></i>Fri 09 May 2014
 </abbr>
 <span class="label">By</span>
 <a href="/author/djjsindy.html"><i class="icon-user"></i>djjsindy</a>
 <span class="label">Category</span>
-<a href="/category/nginx.html"><i class="icon-folder-open"></i>nginx</a>.
+<a href="/category/socket.html"><i class="icon-folder-open"></i>socket</a>.
 
 
 <span class="label">Tags</span>
-	<a href="/tag/nginx.html"><i class="icon-tag"></i>nginx</a>
-</footer><!-- /.post-info --></div>
-                <div class="summary"><p>nginx的所有配置结构体全部放在一个cycle的四级指针中，本文就具体分析一下每级指针究竟指向的是什么</p>
-                        <a class="btn primary xsmall" href="/nginx-pointer.html">more ...</a>
-                </div>
-        </div>
-        <hr />
-        <div class="article">
-                <h1><a href="/nginx-header-buf.html">nginx request buf</a></h1>
-                <div class="well small"><footer class="post-info">
-<span class="label">Date</span>
-<abbr class="published" title="2013-06-26T15:45:00">
-        <i class="icon-calendar"></i>Wed 26 June 2013
-</abbr>
-<span class="label">By</span>
-<a href="/author/djjsindy.html"><i class="icon-user"></i>djjsindy</a>
-<span class="label">Category</span>
-<a href="/category/nginx.html"><i class="icon-folder-open"></i>nginx</a>.
-
-
-<span class="label">Tags</span>
-	<a href="/tag/nginx.html"><i class="icon-tag"></i>nginx</a>
-</footer><!-- /.post-info --></div>
-                <div class="summary"><p>nginx在接收到客户端得请求之后，就开始解析http请求，也就是解析http header，需要分配一段buf来接收这些数据，nginx并不知道这个http header的大小，在nginx配置中<code>client_header_buffer_size</code>和<code>large_client_header_buffers</code>这两个配置项起到了作用</p>
-                        <a class="btn primary xsmall" href="/nginx-header-buf.html">more ...</a>
-                </div>
-        </div>
-        <hr />
-        <div class="article">
-                <h1><a href="/nginx-hash.html">nginx hash结构存储</a></h1>
-                <div class="well small"><footer class="post-info">
-<span class="label">Date</span>
-<abbr class="published" title="2013-06-18T17:34:00">
-        <i class="icon-calendar"></i>Tue 18 June 2013
-</abbr>
-<span class="label">By</span>
-<a href="/author/djjsindy.html"><i class="icon-user"></i>djjsindy</a>
-<span class="label">Category</span>
-<a href="/category/nginx.html"><i class="icon-folder-open"></i>nginx</a>.
-
-
-<span class="label">Tags</span>
-	<a href="/tag/nginx.html"><i class="icon-tag"></i>nginx</a>
-</footer><!-- /.post-info --></div>
-                <div class="summary"><p>nginx在存储server_name和ngx_http_core_srv_conf_t的映射的时候用到了hash结构</p>
-                        <a class="btn primary xsmall" href="/nginx-hash.html">more ...</a>
-                </div>
-        </div>
-        <hr />
-        <div class="article">
-                <h1><a href="/nginx-static-location-tree.html">nginx static location tree</a></h1>
-                <div class="well small"><footer class="post-info">
-<span class="label">Date</span>
-<abbr class="published" title="2013-06-07T23:56:00">
-        <i class="icon-calendar"></i>Fri 07 June 2013
-</abbr>
-<span class="label">By</span>
-<a href="/author/djjsindy.html"><i class="icon-user"></i>djjsindy</a>
-<span class="label">Category</span>
-<a href="/category/nginx.html"><i class="icon-folder-open"></i>nginx</a>.
-
-
-<span class="label">Tags</span>
-	<a href="/tag/nginx.html"><i class="icon-tag"></i>nginx</a>
-</footer><!-- /.post-info --></div>
-                <div class="summary"><p>nginx在处理location的配置的时候，用到了一种三叉排序树，加速了通过request的url和location的映射速度。</p>
-                        <a class="btn primary xsmall" href="/nginx-static-location-tree.html">more ...</a>
-                </div>
-        </div>
-        <hr />
-        <div class="article">
-                <h1><a href="/nginx-init.html">nginx配置初始化过程</a></h1>
-                <div class="well small"><footer class="post-info">
-<span class="label">Date</span>
-<abbr class="published" title="2013-06-05T15:50:00">
-        <i class="icon-calendar"></i>Wed 05 June 2013
-</abbr>
-<span class="label">By</span>
-<a href="/author/djjsindy.html"><i class="icon-user"></i>djjsindy</a>
-<span class="label">Category</span>
-<a href="/category/nginx.html"><i class="icon-folder-open"></i>nginx</a>.
-
-
-<span class="label">Tags</span>
-	<a href="/tag/nginx.html"><i class="icon-tag"></i>nginx</a>
-</footer><!-- /.post-info --></div>
-                <div class="summary"><p>nginx解析配置文件，将解析出来得配置存放在<code>ngx_cycle_s</code>的<code>conf_ctx</code>中，<code>conf_ctx</code>是个四级指针，因为保存这些配置需要context，而这些context是有层级关系</p>
-                        <a class="btn primary xsmall" href="/nginx-init.html">more ...</a>
-                </div>
-        </div>
-        <hr />
-
+	<a href="/tag/socket.html"><i class="icon-tag"></i>socket</a>
+</footer><!-- /.post-info -->                </div>
+                <h1>socket创建流程2</h1>
+<p>linux内核创建socket时，会初始化<code>struct sock</code>，这个结构体主要保存连接状态，相关协议回调函数，主要初始化函数时sock_init_data</p>
+<p>net/ipv4/sock.c
+<pre><code>
+void sock_init_data(struct socket <em>sock, struct sock </em>sk)
+{
+    skb_queue_head_init(&amp;sk-&gt;sk_receive_queue);  //网曾
+    skb_queue_head_init(&amp;sk-&gt;sk_write_queue);
+    skb_queue_head_init(&amp;sk-&gt;sk_error_queue);
+ #ifdef CONFIG_NET_DMA
+    skb_queue_head_init(&amp;sk-&gt;sk_async_wait_queue);
+ #endif
+    sk-&gt;sk_send_head    =   NULL;
+    init_timer(&amp;sk-&gt;sk_timer);
+    sk-&gt;sk_allocation   =   GFP_KERNEL;
+    sk-&gt;sk_rcvbuf       =   sysctl_rmem_default;
+    sk-&gt;sk_sndbuf       =   sysctl_wmem_default;
+    sk-&gt;sk_state        =   TCP_CLOSE;
+    sk_set_socket(sk, sock);
+    sock_set_flag(sk, SOCK_ZAPPED);
+    if (sock) {
+        sk-&gt;sk_type =   sock-&gt;type;
+        sk-&gt;sk_wq   =   sock-&gt;wq;
+        sock-&gt;sk    =   sk;
+    } else
+        sk-&gt;sk_wq   =   NULL;
+    spin_lock_init(&amp;sk-&gt;sk_dst_lock);
+    rwlock_init(&amp;sk-&gt;sk_callback_lock);
+    lockdep_set_class_and_name(&amp;sk-&gt;sk_callback_lock,
+            af_callback_keys + sk-&gt;sk_family,
+            af_family_clock_key_strings[sk-&gt;sk_family]);
+    sk-&gt;sk_state_change =   sock_def_wakeup;
+    sk-&gt;sk_data_ready   =   sock_def_readable;
+    sk-&gt;sk_write_space  =   sock_def_write_space;
+    sk-&gt;sk_error_report =   sock_def_error_report;
+    sk-&gt;sk_destruct     =   sock_def_destruct;
+    sk-&gt;sk_sndmsg_page  =   NULL;
+    sk-&gt;sk_sndmsg_off   =   0;
+    sk-&gt;sk_peer_pid     =   NULL;
+    sk-&gt;sk_peer_cred    =   NULL;
+    sk-&gt;sk_write_pending    =   0;
+    sk-&gt;sk_rcvlowat     =   1;
+    sk-&gt;sk_rcvtimeo     =   MAX_SCHEDULE_TIMEOUT;
+    sk-&gt;sk_sndtimeo     =   MAX_SCHEDULE_TIMEOUT;
+    sk-&gt;sk_stamp = ktime_set(-1L, 0);
+</code></pre></p>
+                </div><!-- /.entry-content -->
+        </article>
+</section>
         </div><!--/span-->
 
                 <div class="span3 well sidebar-nav" id="sidebar">
