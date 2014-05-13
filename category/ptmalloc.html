@@ -1,132 +1,250 @@
 <!DOCTYPE html>
-<html lang="en-US">
-    <head>
-        <meta charset="utf-8"> 
-        <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <meta name="author" content="djjsindy" />
-        <meta name="copyright" content="djjsindy" />
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>djjsindy - ptmalloc</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="">
+    <meta name="author" content="djjsindy">
 
-        <meta property="og:type" content="article" />
-        <meta name="twitter:card" content="summary">
+    <!-- Le styles -->
+    <link rel="stylesheet" href="/theme/css/bootstrap.min.css" type="text/css" />
+    <style type="text/css">
+      body {
+        padding-top: 60px;
+        padding-bottom: 40px;
+      }
+      .sidebar-nav {
+        padding: 9px 0;
+      }
+      .tag-1 {
+        font-size: 13pt;
+      }
+      .tag-2 {
+        font-size: 10pt;
+      }
+      .tag-2 {
+        font-size: 8pt;
+      }
+      .tag-4 {
+        font-size: 6pt;
+     }
+    </style>
+    <link href="/theme/css/bootstrap-responsive.min.css" rel="stylesheet">
+        <link href="/theme/css/font-awesome.css" rel="stylesheet">
 
-<meta property="og:title" content="djjsindy"/>
-<meta name="twitter:title" content="djjsindy">
-<meta property="og:url" content="" />
-<meta property="og:site_name" content="djjsindy" />
-<meta property="og:article:author" content="djjsindy" />
-        <title>djjsindy
-</title>
-        <link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/css/bootstrap-combined.min.css" rel="stylesheet">
-        <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.css" rel="stylesheet">
-        <link rel="stylesheet" type="text/css" href="/theme/css/pygments.css" media="screen">
-        <link rel="stylesheet" type="text/css" href="/theme/tipuesearch/tipuesearch.css" media="screen">
-        <link rel="stylesheet" type="text/css" href="/theme/css/elegant.css" media="screen">
-        <link rel="stylesheet" type="text/css" href="/theme/css/custom.css" media="screen">
-        <link href="/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="djjsindy - Full Atom Feed" />
-<script>
-    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-     (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-     m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-     })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
-    ga('create', 'UA-43260693-1', 'auto');
-    ga('send', 'pageview');
-</script>
-    </head>
-    <body>
-        <div id="content-sans-footer">
-        <div class="navbar navbar-static-top">
-            <div class="navbar-inner">
-                <div class="container">
-                    <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
-                        <span class="icon-bar"></span>
-                        <span class="icon-bar"></span>
-                        <span class="icon-bar"></span>
-                    </a>
-                    <a class="brand" href="/"><span class=site-name>djjsindy</span></a>
-                    <div class="nav-collapse collapse">
-                        <ul class="nav pull-right top-menu">
-                            <li ><a href="">Home</a></li>
-                            <li ><a href="/categories.html">Categories</a></li>
-                            <li ><a href="/tags.html">Tags</a></li>
-                            <li ><a href="/archives.html">Archives</a></li>
-                            <li><form class="navbar-search" action="/search.html" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <link href="/theme/css/pygments.css" rel="stylesheet">
+
+    <!-- Le HTML5 shim, for IE6-8 support of HTML5 elements -->
+    <!--[if lt IE 9]>
+      <script src="//html5shim.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+
+    <!-- Le fav and touch icons -->
+    <link rel="shortcut icon" href="/theme/images/favicon.ico">
+    <link rel="apple-touch-icon" href="/theme/images/apple-touch-icon.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="/theme/images/apple-touch-icon-72x72.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="/theme/images/apple-touch-icon-114x114.png">
+
+    <link href="/" type="application/atom+xml" rel="alternate" title="djjsindy ATOM Feed" />
+
+  </head>
+
+  <body>
+
+    <div class="navbar navbar-fixed-top">
+      <div class="navbar-inner">
         <div class="container-fluid">
-            <div class="row-fluid">
-                <div class="span1"></div>
-                <div class="span10">
-<div class="row-fluid">
+          <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </a>
+          <a class="brand" href="/index.html">djjsindy </a>
+          <div class="nav-collapse">
+            <ul class="nav">
+                          <li class="divider-vertical"></li>
+                  <li >
+                    <a href="/category/nginx.html">
+						<i class="icon-folder-open icon-large"></i>nginx
+					</a>
+                  </li>
+                  <li class="active">
+                    <a href="/category/ptmalloc.html">
+						<i class="icon-folder-open icon-large"></i>ptmalloc
+					</a>
+                  </li>
+                  <li >
+                    <a href="/category/socket.html">
+						<i class="icon-folder-open icon-large"></i>socket
+					</a>
+                  </li>
+                  <li >
+                    <a href="/category/tomcat.html">
+						<i class="icon-folder-open icon-large"></i>tomcat
+					</a>
+                  </li>
 
-    <div class="row-fluid">
+                          <ul class="nav pull-right">
+                                <li><a href="/archives.html"><i class="icon-th-list"></i>Archives</a></li>
+                          </ul>
 
+            </ul>
+            <!--<p class="navbar-text pull-right">Logged in as <a href="#">username</a></p>-->
+          </div><!--/.nav-collapse -->
+        </div>
+      </div>
     </div>
 
-    <div class="row-fluid">
-        <div class="span8 offset2">
-            <header>
-            <h1 id="recent-posts">Recent Posts <a id="allposts" href="/archives.html">all posts</a></h1>
-            </header>
-        <div class="recent-posts">
-            <article>
-                <a href="/ptmalloc-freeguo-cheng.html">ptmalloc free过程  </a>
-                <section>
-                    posted in
-                <a href="/categories.html#ptmalloc-ref">ptmalloc</a>
-                <div class="recent-posts-time">
-                <time pubdate="pubdate" datetime="2014-02-21T16:34:00">Fri 21 February 2014</time>
+    <div class="container-fluid">
+      <div class="row">
+        <div class="span9" id="content">
+        <div class="article">
+                <h1><a href="/ptmalloc-freeguo-cheng.html">ptmalloc free过程</a></h1>
+                <div class="well small"><footer class="post-info">
+<span class="label">Date</span>
+<abbr class="published" title="2014-02-21T16:34:00">
+        <i class="icon-calendar"></i>Fri 21 February 2014
+</abbr>
+<span class="label">By</span>
+<a href="/author/djjsindy.html"><i class="icon-user"></i>djjsindy</a>
+<span class="label">Category</span>
+<a href="/category/ptmalloc.html"><i class="icon-folder-open"></i>ptmalloc</a>.
+
+
+<span class="label">Tags</span>
+	<a href="/tag/ptmalloc.html"><i class="icon-tag"></i>ptmalloc</a>
+</footer><!-- /.post-info --></div>
+                <div class="summary"><p>ptmalloc free函数并不是直接释放占用的空间给操作系统，在一些情况下才会释放给操作系统。</p>
+                        <a class="btn primary xsmall" href="/ptmalloc-freeguo-cheng.html">more ...</a>
                 </div>
-                </section>
-            </article>
-            <article>
-                <a href="/malloc_chunkbian-jie-biao-ji-fa.html">malloc_chunk边界标记法  </a>
-                <section>
-                    posted in
-                <a href="/categories.html#ptmalloc-ref">ptmalloc</a>
-                <div class="recent-posts-time">
-                <time pubdate="pubdate" datetime="2014-02-17T10:04:00">Mon 17 February 2014</time>
-                </div>
-                </section>
-            </article>
-            <article>
-                <a href="/ptmalloczhong-de-fastbin-chunkde-he-bing-guo-cheng.html">ptmalloc中的fastbin chunk的合并过程  </a>
-                <section>
-                    posted in
-                <a href="/categories.html#ptmalloc-ref">ptmalloc</a>
-                <div class="recent-posts-time">
-                <time pubdate="pubdate" datetime="2014-02-17T10:04:00">Mon 17 February 2014</time>
-                </div>
-                </section>
-            </article>
         </div>
-        </div>
-    </div>
-</div>
+        <hr />
+        <div class="article">
+                <h1><a href="/malloc_chunkbian-jie-biao-ji-fa.html">malloc_chunk边界标记法</a></h1>
+                <div class="well small"><footer class="post-info">
+<span class="label">Date</span>
+<abbr class="published" title="2014-02-17T10:04:00">
+        <i class="icon-calendar"></i>Mon 17 February 2014
+</abbr>
+<span class="label">By</span>
+<a href="/author/djjsindy.html"><i class="icon-user"></i>djjsindy</a>
+<span class="label">Category</span>
+<a href="/category/ptmalloc.html"><i class="icon-folder-open"></i>ptmalloc</a>.
+
+
+<span class="label">Tags</span>
+	<a href="/tag/ptmalloc.html"><i class="icon-tag"></i>ptmalloc</a>
+</footer><!-- /.post-info --></div>
+                <div class="summary"><p>ptmalloc分配的空间统一用了<code>malloc_chunk</code>结构来管理，<code>malloc_chunk</code>的结构初看比较奇葩，看了注释，分析了一段时间的代码，发现这种边界标记的设计，在<code>malloc_chunk</code>虚拟地址都是彼此相邻的情况下，是十分高效的。</p>
+                        <a class="btn primary xsmall" href="/malloc_chunkbian-jie-biao-ji-fa.html">more ...</a>
                 </div>
-                <div class="span1"></div>
-            </div>
         </div>
-        <div id="push"></div>
-    </div>
-<footer>
-<div id="footer">
-    <ul class="footer-content">
-        <li class="elegant-power">Powered by <a href="http://getpelican.com/" title="Pelican Home Page">Pelican</a>. Theme: <a href="http://oncrashreboot.com/pelican-elegant" title="Theme Elegant Home Page">Elegant</a> by <a href="http://oncrashreboot.com" title="Talha Mansoor Home Page">Talha Mansoor</a></li>
-    </ul>
-</div>
-</footer>        <script src="http://code.jquery.com/jquery.min.js"></script>
-        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
-        <script>
-            function validateForm(query)
-            {
-                return (query.length > 0);
-            }
-        </script>
-    </body>
-    <!-- Theme: Elegant built for Pelican
-    License : http://oncrashreboot.com/pelican-elegant -->
+        <hr />
+        <div class="article">
+                <h1><a href="/ptmalloczhong-de-fastbin-chunkde-he-bing-guo-cheng.html">ptmalloc中的fastbin chunk的合并过程</a></h1>
+                <div class="well small"><footer class="post-info">
+<span class="label">Date</span>
+<abbr class="published" title="2014-02-17T10:04:00">
+        <i class="icon-calendar"></i>Mon 17 February 2014
+</abbr>
+<span class="label">By</span>
+<a href="/author/djjsindy.html"><i class="icon-user"></i>djjsindy</a>
+<span class="label">Category</span>
+<a href="/category/ptmalloc.html"><i class="icon-folder-open"></i>ptmalloc</a>.
+
+
+<span class="label">Tags</span>
+	<a href="/tag/ptmalloc.html"><i class="icon-tag"></i>ptmalloc</a>
+</footer><!-- /.post-info --></div>
+                <div class="summary"><p>最近在设计一个memcache协议队列的内存管理模块，其实<code>malloc</code>和<code>free</code>并不是想象中的那种，<code>malloc</code>完空间<code>free</code>就会马上把内存返回给操作系统，所以了解一下glibc 中malloc和free函数的实现是十分必要的。了解了glibc中<code>malloc</code>实现原理对于设计一个自己的内存管理模块是十分有意义的，可以从中学到很多的优良设计。</p>
+                        <a class="btn primary xsmall" href="/ptmalloczhong-de-fastbin-chunkde-he-bing-guo-cheng.html">more ...</a>
+                </div>
+        </div>
+        <hr />
+
+        </div><!--/span-->
+
+                <div class="span3 well sidebar-nav" id="sidebar">
+<ul class="nav nav-list">
+
+<li class="nav-header"><h4><i class="icon-folder-close icon-large"></i>Categories</h4></li>
+<li>
+<a href="/category/nginx.html">
+    <i class="icon-folder-open icon-large"></i>nginx
+</a>
+</li>
+<li>
+<a href="/category/ptmalloc.html">
+    <i class="icon-folder-open icon-large"></i>ptmalloc
+</a>
+</li>
+<li>
+<a href="/category/socket.html">
+    <i class="icon-folder-open icon-large"></i>socket
+</a>
+</li>
+<li>
+<a href="/category/tomcat.html">
+    <i class="icon-folder-open icon-large"></i>tomcat
+</a>
+</li>
+
+<li class="nav-header"><h4><i class="icon-tags icon-large"></i>Tags</h4></li>
+<li class="tag-1">
+    <a href="/tag/ptmalloc.html">
+        <i class="icon-tag icon-large"></i>ptmalloc
+    </a>
+</li>
+<li class="tag-2">
+    <a href="/tag/tomcat.html">
+        <i class="icon-tag icon-large"></i>tomcat
+    </a>
+</li>
+<li class="tag-1">
+    <a href="/tag/nginx.html">
+        <i class="icon-tag icon-large"></i>nginx
+    </a>
+</li>
+<li class="tag-1">
+    <a href="/tag/socket.html">
+        <i class="icon-tag icon-large"></i>socket
+    </a>
+</li>
+
+
+</ul>        </div><!--/.well -->
+
+      </div><!--/row-->
+
+      <hr>
+
+      <footer>
+        <address id="about">
+                Proudly powered by <a href="http://pelican.notmyidea.org/">Pelican <i class="icon-external-link"></i></a>,
+                                which takes great advantage of <a href="http://python.org">Python <i class="icon-external-link"></i></a>.
+        </address><!-- /#about -->
+
+        <p>The theme is from <a href="http://twitter.github.com/bootstrap/">Bootstrap from Twitter <i class="icon-external-link"></i></a>,
+                   and <a href="http://fortawesome.github.com/Font-Awesome/">Font-Awesome <i class="icon-external-link"></i></a>, thanks!</p>
+      </footer>
+
+    </div><!--/.fluid-container-->
+
+
+<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+try {
+	var pageTracker = _gat._getTracker("UA-43260693-1");
+pageTracker._trackPageview();
+} catch(err) {}</script>
+
+    <!-- Le javascript -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="/theme/js/jquery-1.7.2.min.js"></script>
+    <script src="/theme/js/bootstrap.min.js"></script>
+  </body>
 </html>
