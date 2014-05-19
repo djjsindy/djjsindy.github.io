@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>select函数原理-1</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="">
+    <meta name="author" content="djjsindy">
+
+    <!-- Le styles -->
+    <link rel="stylesheet" href="/theme/css/bootstrap.min.css" type="text/css" />
+    <style type="text/css">
+      body {
+        padding-top: 60px;
+        padding-bottom: 40px;
+      }
+      .sidebar-nav {
+        padding: 9px 0;
+      }
+      .tag-1 {
+        font-size: 13pt;
+      }
+      .tag-2 {
+        font-size: 10pt;
+      }
+      .tag-2 {
+        font-size: 8pt;
+      }
+      .tag-4 {
+        font-size: 6pt;
+     }
+    </style>
+    <link href="/theme/css/bootstrap-responsive.min.css" rel="stylesheet">
+        <link href="/theme/css/font-awesome.css" rel="stylesheet">
+
+    <link href="/theme/css/pygments.css" rel="stylesheet">
+
+    <!-- Le HTML5 shim, for IE6-8 support of HTML5 elements -->
+    <!--[if lt IE 9]>
+      <script src="//html5shim.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+
+    <!-- Le fav and touch icons -->
+    <link rel="shortcut icon" href="/theme/images/favicon.ico">
+    <link rel="apple-touch-icon" href="/theme/images/apple-touch-icon.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="/theme/images/apple-touch-icon-72x72.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="/theme/images/apple-touch-icon-114x114.png">
+
+    <link href="/" type="application/atom+xml" rel="alternate" title="djjsindy ATOM Feed" />
+
+  </head>
+
+  <body>
+
+    <div class="navbar navbar-fixed-top">
+      <div class="navbar-inner">
+        <div class="container-fluid">
+          <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </a>
+          <a class="brand" href="/index.html">djjsindy </a>
+          <div class="nav-collapse">
+            <ul class="nav">
+                          <li class="divider-vertical"></li>
+                  <li >
+                    <a href="/category/nginx.html">
+						<i class="icon-folder-open icon-large"></i>nginx
+					</a>
+                  </li>
+                  <li >
+                    <a href="/category/ptmalloc.html">
+						<i class="icon-folder-open icon-large"></i>ptmalloc
+					</a>
+                  </li>
+                  <li class="active">
+                    <a href="/category/socket.html">
+						<i class="icon-folder-open icon-large"></i>socket
+					</a>
+                  </li>
+                  <li >
+                    <a href="/category/tomcat.html">
+						<i class="icon-folder-open icon-large"></i>tomcat
+					</a>
+                  </li>
+
+                          <ul class="nav pull-right">
+                                <li><a href="/archives.html"><i class="icon-th-list"></i>Archives</a></li>
+                          </ul>
+
+            </ul>
+            <!--<p class="navbar-text pull-right">Logged in as <a href="#">username</a></p>-->
+          </div><!--/.nav-collapse -->
+        </div>
+      </div>
+    </div>
+
+    <div class="container-fluid">
+      <div class="row">
+        <div class="span9" id="content">
+<section id="content">
+        <article>
+                <header>
+                        <h1>
+                                <a href=""
+                                        rel="bookmark"
+                                        title="Permalink to select函数原理-1">
+                                        select函数原理-1
+                                </a>
+                        </h1>
+                </header>
+                <div class="entry-content">
+                <div class="well">
+<footer class="post-info">
+<span class="label">Date</span>
+<abbr class="published" title="2014-05-19T16:09:00">
+        <i class="icon-calendar"></i>Mon 19 May 2014
+</abbr>
+<span class="label">By</span>
+<a href="/author/djjsindy.html"><i class="icon-user"></i>djjsindy</a>
+<span class="label">Category</span>
+<a href="/category/socket.html"><i class="icon-folder-open"></i>socket</a>.
+
+
+<span class="label">Tags</span>
+	<a href="/tag/socket.html"><i class="icon-tag"></i>socket</a>
+</footer><!-- /.post-info -->                </div>
+                <h1>select函数原理-1</h1>
+<p>select函数大体原理：函数首先会递归每个文件描述符检查事件，如果没有相关的事件，那么就把当前进程添加到wait_queue中，然后改变当前进程的状态，使得进程不会得到时间片，从而使进程休眠；当设备中断，调用相关的驱动的方法，这时会检查wait_queue,然后唤醒相关的进程，这样会导致select进程继续执行，从新检查文件描述符的状态，这时至少有一个事件被激发，这样select函数就会返回了。select函数会顺序检查每个文件描述符的状态，当文件描述符数量十分巨大的情况下，会导致select函数的效率下降。</p>
+<p>select的核心函数是do_select函数，代码我就不copy了，说下里面必要重要的wait_queue的相关操作，初始化函数是<code>poll_initwait</code></p>
+<p>fs/select.c</p>
+<pre><code>
+void poll_initwait(struct poll_wqueues *pwq)
+{
+    init_poll_funcptr(&pwq->pt, __pollwait); //设置wait的时候的处理函数，在需要进程需要休眠的时候调用这个函数
+    pwq->polling_task = current; //设置休眠的进程
+    pwq->triggered = 0;
+    pwq->error = 0;
+    pwq->table = NULL; //初始化为null，后面有自己分配的地方
+    pwq->inline_index = 0;
+}
+</code></pre>
+
+<p><code>do_select</code>函数第一次会检查一下文件描述符的状态，同时设置好wait_queue触发的状态。</p>
+<p>file_operations的poll函数是检查一下文件是否有满足的状态，在调用poll函数之前，先设置poll关心的key</p>
+<p>fs/select.c</p>
+<pre><code>
+  f_op = file->f_op;
+  mask = DEFAULT_POLLMASK;
+  if (f_op && f_op->poll) {
+    wait_key_set(wait, in, out, bit);
+    mask = (*f_op->poll)(file, wait);
+  }
+</code></pre>
+
+<p><code>wait_key_set</code>就是设置poll关心的key</p>
+<p>fs/select.c</p>
+<pre><code>
+static inline void wait_key_set(poll_table *wait, unsigned long in,
+                unsigned long out, unsigned long bit)
+{
+    if (wait) {
+        wait->key = POLLEX_SET; //无论设置什么key，都需要关心exception状态
+        if (in & bit)
+            wait->key |= POLLIN_SET;  //设置读事件的key
+        if (out & bit)
+            wait->key |= POLLOUT_SET; //设置写事件的key
+    }
+}
+</code></pre>
+
+<p><code>f_op-&gt;poll</code>，考虑网络连接fd，tcp连接，对应<code>tcp_poll</code>函数，这个函数首先设置wait_queue，然后检查socket状态。首先看下设置wait_queue的函数<code>sock_poll_wait</code></p>
+<pre><code>
+static inline void sock_poll_wait(struct file *filp,
+        wait_queue_head_t *wait_address, poll_table *p)
+{
+    if (p && wait_address) { //这里wait_address是struct sock中的sk_wq的wait_queue_head_t，可以看出个大概，就是把poll_table中的进程加入到sk_wq的wait_queue中，然后中断处理函数，会找到sock中的wait head，挨个唤醒进程
+        poll_wait(filp, wait_address, p);
+        /*
+         * We need to be sure we are in sync with the
+         * socket flags modification.
+         *
+         * This memory barrier is paired in the wq_has_sleeper.
+        */
+        smp_mb();
+    }
+}
+</code></pre>
+
+<p>poll_wait函数调用的就是poll_table中的func函数</p>
+<p>fs/select.c</p>
+<pre><code>
+static void __pollwait(struct file *filp, wait_queue_head_t *wait_address,
+                poll_table *p)
+{
+    struct poll_wqueues *pwq = container_of(p, struct poll_wqueues, pt);
+    struct poll_table_entry *entry = poll_get_entry(pwq);  //获得entry
+    if (!entry)
+        return;
+    get_file(filp);
+    entry->filp = filp; 
+    entry->wait_address = wait_address;
+    entry->key = p->key; //设置关心的key，根据key来唤醒进程
+    init_waitqueue_func_entry(&entry->wait, pollwake); //设置唤醒回调函数
+    entry->wait.private = pwq;
+    add_wait_queue(wait_address, &entry->wait);//加入到sock的wait队列中
+}
+</code></pre>
+
+<p>在创建<code>struct sock</code>的时候，函数<code>sock_init_data</code>设置了几个回调函数</p>
+<p>net/core/sock.c</p>
+<pre><code>
+    sk->sk_state_change =   sock_def_wakeup; //连接状态变化
+    sk->sk_data_ready   =   sock_def_readable; // socket有可读数据
+    sk->sk_write_space  =   sock_def_write_space; //socket上可以写入数据
+    sk->sk_error_report =   sock_def_error_report; //socket上有错误
+    sk->sk_destruct     =   sock_def_destruct;
+</code></pre>
+
+<p>这些回调函数都是底层网络驱动通过中断，先把数据提交到网络层，然后提交到传输层，最后调用回调函数来唤醒休眠的进程。具体的回调过程不是这个主题的重点，先不考虑。</p>
+<p>看下sock_def_readable函数的实现</p>
+<p>net/core/sock.c</p>
+<pre><code>
+static void sock_def_readable(struct sock *sk, int len)
+{
+    struct socket_wq *wq;
+
+    rcu_read_lock();
+    wq = rcu_dereference(sk->sk_wq); //获得等待队列
+    if (wq_has_sleeper(wq))
+        wake_up_interruptible_sync_poll(&wq->wait, POLLIN | POLLPRI |
+                        POLLRDNORM | POLLRDBAND); //最后的flag匹配entry->key
+    sk_wake_async(sk, SOCK_WAKE_WAITD, POLL_IN); //异步io，发送信号
+    rcu_read_unlock();
+}
+</code></pre>
+
+<p>最终wake_up_interruptible_sync_poll函数最终会调用到__wake_up_common</p>
+<p>kernel/sched.c</p>
+<pre><code>
+tatic void __wake_up_common(wait_queue_head_t *q, unsigned int mode,
+            int nr_exclusive, int wake_flags, void *key)
+{
+    wait_queue_t *curr, *next;
+    //递归每一个挂在sock等待队列中的每一个元素
+    list_for_each_entry_safe(curr, next, &q->task_list, task_list) {
+        unsigned flags = curr->flags;
+        //调用wakeup回调函数
+        if (curr->func(curr, mode, wake_flags, key) &&
+                (flags & WQ_FLAG_EXCLUSIVE) && !--nr_exclusive)
+            break;
+    }
+}
+</code></pre>
+
+<p>这里func是之前注册的回调函数poll_wake函数</p>
+<p>fs/select.c</p>
+<pre><code>
+static int pollwake(wait_queue_t *wait, unsigned mode, int sync, void *key)
+{
+    struct poll_table_entry *entry;
+
+    entry = container_of(wait, struct poll_table_entry, wait);
+    //匹配key，如果匹配才唤醒进程，否则退出
+    if (key && !((unsigned long)key & entry->key))
+        return 0;
+    return __pollwake(wait, mode, sync, key);
+}
+</code></pre>
+                </div><!-- /.entry-content -->
+        </article>
+</section>
+        </div><!--/span-->
+
+                <div class="span3 well sidebar-nav" id="sidebar">
+<ul class="nav nav-list">
+
+<li class="nav-header"><h4><i class="icon-folder-close icon-large"></i>Categories</h4></li>
+<li>
+<a href="/category/nginx.html">
+    <i class="icon-folder-open icon-large"></i>nginx
+</a>
+</li>
+<li>
+<a href="/category/ptmalloc.html">
+    <i class="icon-folder-open icon-large"></i>ptmalloc
+</a>
+</li>
+<li>
+<a href="/category/socket.html">
+    <i class="icon-folder-open icon-large"></i>socket
+</a>
+</li>
+<li>
+<a href="/category/tomcat.html">
+    <i class="icon-folder-open icon-large"></i>tomcat
+</a>
+</li>
+
+<li class="nav-header"><h4><i class="icon-tags icon-large"></i>Tags</h4></li>
+<li class="tag-1">
+    <a href="/tag/ptmalloc.html">
+        <i class="icon-tag icon-large"></i>ptmalloc
+    </a>
+</li>
+<li class="tag-1">
+    <a href="/tag/socket.html">
+        <i class="icon-tag icon-large"></i>socket
+    </a>
+</li>
+<li class="tag-1">
+    <a href="/tag/nginx.html">
+        <i class="icon-tag icon-large"></i>nginx
+    </a>
+</li>
+<li class="tag-2">
+    <a href="/tag/tomcat.html">
+        <i class="icon-tag icon-large"></i>tomcat
+    </a>
+</li>
+
+
+</ul>        </div><!--/.well -->
+
+      </div><!--/row-->
+
+      <hr>
+
+      <footer>
+        <address id="about">
+                Proudly powered by <a href="http://pelican.notmyidea.org/">Pelican <i class="icon-external-link"></i></a>,
+                                which takes great advantage of <a href="http://python.org">Python <i class="icon-external-link"></i></a>.
+        </address><!-- /#about -->
+
+        <p>The theme is from <a href="http://twitter.github.com/bootstrap/">Bootstrap from Twitter <i class="icon-external-link"></i></a>,
+                   and <a href="http://fortawesome.github.com/Font-Awesome/">Font-Awesome <i class="icon-external-link"></i></a>, thanks!</p>
+      </footer>
+
+    </div><!--/.fluid-container-->
+
+
+<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+try {
+	var pageTracker = _gat._getTracker("UA-43260693-1");
+pageTracker._trackPageview();
+} catch(err) {}</script>
+
+    <!-- Le javascript -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="/theme/js/jquery-1.7.2.min.js"></script>
+    <script src="/theme/js/bootstrap.min.js"></script>
+  </body>
+</html>
