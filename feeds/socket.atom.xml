@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom"><title>djjsindy</title><link href="/" rel="alternate"></link><link href="/feeds/socket.atom.xml" rel="self"></link><id>/</id><updated>2014-05-19T16:09:00+02:00</updated><entry><title>select函数原理-1</title><link href="/selecthan-shu-yuan-li-1.html" rel="alternate"></link><updated>2014-05-19T16:09:00+02:00</updated><author><name>djjsindy</name></author><id>tag:,2014-05-19:selecthan-shu-yuan-li-1.html</id><summary type="html">&lt;h1&gt;select函数原理-1&lt;/h1&gt;
+<feed xmlns="http://www.w3.org/2005/Atom"><title>djjsindy</title><link href="/" rel="alternate"></link><link href="/feeds/socket.atom.xml" rel="self"></link><id>/</id><updated>2014-05-19T16:09:00+02:00</updated><entry><title>select函数原理</title><link href="/selecthan-shu-yuan-li.html" rel="alternate"></link><updated>2014-05-19T16:09:00+02:00</updated><author><name>djjsindy</name></author><id>tag:,2014-05-19:selecthan-shu-yuan-li.html</id><summary type="html">&lt;h1&gt;select函数原理&lt;/h1&gt;
 &lt;p&gt;select函数大体原理：函数首先会递归每个文件描述符检查事件，如果没有相关的事件，那么就把当前进程添加到wait_queue中，然后改变当前进程的状态，使得进程不会得到时间片，从而使进程休眠；当设备中断，调用相关的驱动的方法，这时会检查wait_queue,然后唤醒相关的进程，这样会导致select进程继续执行，从新检查文件描述符的状态，这时至少有一个事件被激发，这样select函数就会返回了。select函数会顺序检查每个文件描述符的状态，当文件描述符数量十分巨大的情况下，会导致select函数的效率下降。&lt;/p&gt;
 &lt;p&gt;select的核心函数是do_select函数，代码我就不copy了，说下里面必要重要的wait_queue的相关操作，初始化函数是&lt;code&gt;poll_initwait&lt;/code&gt;&lt;/p&gt;
 &lt;p&gt;fs/select.c&lt;/p&gt;
@@ -140,7 +140,88 @@ static int pollwake(wait_queue_t *wait, unsigned mode, int sync, void *key)
         return 0;
     return __pollwake(wait, mode, sync, key);
 }
-&lt;/code&gt;&lt;/pre&gt;</summary><category term="socket"></category></entry><entry><title>socket绑定端口流程</title><link href="/socketbang-ding-duan-kou-liu-cheng.html" rel="alternate"></link><updated>2014-05-13T11:33:00+02:00</updated><author><name>djjsindy</name></author><id>tag:,2014-05-13:socketbang-ding-duan-kou-liu-cheng.html</id><summary type="html">&lt;h1&gt;socket绑定端口过程&lt;/h1&gt;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;tcp_poll函数中设置完wait queue后，会首先检查一下socket的状态，检查是否有相关的事件发生，对于listening状态的socket，只要判断accept队列是否有连接即可，如果不为空，那么触发读相关事件&lt;/p&gt;
+&lt;p&gt;首先看下触发读写状态的条件&lt;/p&gt;
+&lt;p&gt;fs/select.c&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;
+//触发读事件
+#define POLLIN_SET (POLLRDNORM | POLLRDBAND | POLLIN | POLLHUP | POLLERR)
+//触发写事件
+#define POLLOUT_SET (POLLWRBAND | POLLWRNORM | POLLOUT | POLLERR)
+//触发异常事件
+#define POLLEX_SET (POLLPRI)
+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;pre&gt;&lt;code&gt;
+static inline unsigned int inet_csk_listen_poll(const struct sock *sk)
+{
+    return !reqsk_queue_empty(&amp;inet_csk(sk)-&gt;icsk_accept_queue) ?
+            (POLLIN | POLLRDNORM) : 0;
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;如果不是listening状态的socket，那么需要判断相关的相关参数
+&lt;pre&gt;&lt;code&gt;
+    //关闭状态，触发读事件
+    if (sk-&amp;gt;sk_shutdown == SHUTDOWN_MASK || sk-&amp;gt;sk_state == TCP_CLOSE)
+        mask |= POLLHUP;
+    //读关闭，触发读事件
+    if (sk-&amp;gt;sk_shutdown &amp;amp; RCV_SHUTDOWN)
+        mask |= POLLIN | POLLRDNORM | POLLRDHUP;&lt;/p&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="cm"&gt;/* Connected? */&lt;/span&gt;
+&lt;span class="c1"&gt;//如果当前socket状态不是sync sent或者sync recv&lt;/span&gt;
+&lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;((&lt;/span&gt;&lt;span class="mh"&gt;1&lt;/span&gt; &lt;span class="o"&gt;&amp;lt;&amp;lt;&lt;/span&gt; &lt;span class="n"&gt;sk&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;sk_state&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="o"&gt;~&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="no"&gt;TCPF_SYN_SENT&lt;/span&gt; &lt;span class="o"&gt;|&lt;/span&gt; &lt;span class="no"&gt;TCPF_SYN_RECV&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="c1"&gt;//获得读水位&lt;/span&gt;
+    &lt;span class="k"&gt;int&lt;/span&gt; &lt;span class="n"&gt;target&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;sock_rcvlowat&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;sk&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mh"&gt;0&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="no"&gt;INT_MAX&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+
+    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;tp&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;urg_seq&lt;/span&gt; &lt;span class="o"&gt;==&lt;/span&gt; &lt;span class="n"&gt;tp&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;copied_seq&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&amp;amp;&lt;/span&gt;
+        &lt;span class="o"&gt;!&lt;/span&gt;&lt;span class="n"&gt;sock_flag&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;sk&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="no"&gt;SOCK_URGINLINE&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&amp;amp;&lt;/span&gt;
+        &lt;span class="n"&gt;tp&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;urg_data&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+        &lt;span class="n"&gt;target&lt;/span&gt;&lt;span class="o"&gt;++&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+
+    &lt;span class="cm"&gt;/* Potential race condition. If read of tp below will&lt;/span&gt;
+&lt;span class="cm"&gt;     * escape above sk-&amp;gt;sk_state, we can be illegally awaken&lt;/span&gt;
+&lt;span class="cm"&gt;     * in SYN_* states. */&lt;/span&gt;
+     &lt;span class="c1"&gt;//如果有数据超过了水位线,触发读事件&lt;/span&gt;
+    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;tp&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;rcv_nxt&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt; &lt;span class="n"&gt;tp&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;copied_seq&lt;/span&gt; &lt;span class="o"&gt;&amp;gt;=&lt;/span&gt; &lt;span class="n"&gt;target&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+        &lt;span class="n"&gt;mask&lt;/span&gt; &lt;span class="o"&gt;|=&lt;/span&gt; &lt;span class="no"&gt;POLLIN&lt;/span&gt; &lt;span class="o"&gt;|&lt;/span&gt; &lt;span class="no"&gt;POLLRDNORM&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="c1"&gt;//如果不是写半关闭&lt;/span&gt;
+    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;!&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;sk&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;sk_shutdown&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="no"&gt;SEND_SHUTDOWN&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+        &lt;span class="c1"&gt;//如果有写的空间，触发写事件&lt;/span&gt;
+        &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;sk_stream_wspace&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;sk&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="o"&gt;&amp;gt;=&lt;/span&gt; &lt;span class="n"&gt;sk_stream_min_wspace&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;sk&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+            &lt;span class="n"&gt;mask&lt;/span&gt; &lt;span class="o"&gt;|=&lt;/span&gt; &lt;span class="no"&gt;POLLOUT&lt;/span&gt; &lt;span class="o"&gt;|&lt;/span&gt; &lt;span class="no"&gt;POLLWRNORM&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+        &lt;span class="p"&gt;}&lt;/span&gt; &lt;span class="k"&gt;else&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;  &lt;span class="cm"&gt;/* send SIGIO later */&lt;/span&gt;
+            &lt;span class="n"&gt;set_bit&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="no"&gt;SOCK_ASYNC_NOSPACE&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
+                &lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;sk&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;sk_socket&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;flags&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+            &lt;span class="n"&gt;set_bit&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="no"&gt;SOCK_NOSPACE&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;sk&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;sk_socket&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;flags&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+
+            &lt;span class="cm"&gt;/* Race breaker. If space is freed after&lt;/span&gt;
+&lt;span class="cm"&gt;             * wspace test but before the flags are set,&lt;/span&gt;
+&lt;span class="cm"&gt;             * IO signal will be lost.&lt;/span&gt;
+&lt;span class="cm"&gt;             */&lt;/span&gt;
+            &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;sk_stream_wspace&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;sk&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="o"&gt;&amp;gt;=&lt;/span&gt; &lt;span class="n"&gt;sk_stream_min_wspace&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;sk&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt;
+                &lt;span class="n"&gt;mask&lt;/span&gt; &lt;span class="o"&gt;|=&lt;/span&gt; &lt;span class="no"&gt;POLLOUT&lt;/span&gt; &lt;span class="o"&gt;|&lt;/span&gt; &lt;span class="no"&gt;POLLWRNORM&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+        &lt;span class="p"&gt;}&lt;/span&gt;
+    &lt;span class="p"&gt;}&lt;/span&gt; &lt;span class="k"&gt;else&lt;/span&gt;
+        &lt;span class="c1"&gt;//写半关闭触发写事件&lt;/span&gt;
+        &lt;span class="n"&gt;mask&lt;/span&gt; &lt;span class="o"&gt;|=&lt;/span&gt; &lt;span class="no"&gt;POLLOUT&lt;/span&gt; &lt;span class="o"&gt;|&lt;/span&gt; &lt;span class="no"&gt;POLLWRNORM&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+
+    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;tp&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;urg_data&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="no"&gt;TCP_URG_VALID&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+        &lt;span class="n"&gt;mask&lt;/span&gt; &lt;span class="o"&gt;|=&lt;/span&gt; &lt;span class="no"&gt;POLLPRI&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+&lt;span class="p"&gt;}&lt;/span&gt;
+&lt;span class="cm"&gt;/* This barrier is coupled with smp_wmb() in tcp_reset() */&lt;/span&gt;
+&lt;span class="n"&gt;smp_rmb&lt;/span&gt;&lt;span class="p"&gt;();&lt;/span&gt;
+&lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;sk&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;sk_err&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+    &lt;span class="n"&gt;mask&lt;/span&gt; &lt;span class="o"&gt;|=&lt;/span&gt; &lt;span class="no"&gt;POLLERR&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+
+&lt;span class="k"&gt;return&lt;/span&gt; &lt;span class="n"&gt;mask&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;p&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/p&gt;</summary><category term="socket"></category></entry><entry><title>socket绑定端口流程</title><link href="/socketbang-ding-duan-kou-liu-cheng.html" rel="alternate"></link><updated>2014-05-13T11:33:00+02:00</updated><author><name>djjsindy</name></author><id>tag:,2014-05-13:socketbang-ding-duan-kou-liu-cheng.html</id><summary type="html">&lt;h1&gt;socket绑定端口过程&lt;/h1&gt;
 &lt;p&gt;绑定端口分为2种，一种是指定端口号，然后内核去判断这个端口号是否可用，另一种是填端口号为0，内核去从端口号范围内选择一个端口。具体过程是在inet_csk_get_port函数中，本文中内核版本2.6.39.14&lt;/p&gt;
 &lt;p&gt;先说明一个非常重要的函数inet_csk_bind_conflict，在bind hash找到相同的端口，那么会根据reuseaddr，reuseport和tcp状态来决定这个端口是否是可用。
 &lt;pre&gt;&lt;code&gt;
