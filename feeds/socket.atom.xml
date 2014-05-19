@@ -1,42 +1,254 @@
 <?xml version="1.0" encoding="utf-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom"><title>djjsindy</title><link href="/" rel="alternate"></link><link href="/feeds/socket.atom.xml" rel="self"></link><id>/</id><updated>2014-05-13T11:33:00+02:00</updated><entry><title>socket绑定端口流程</title><link href="/socketbang-ding-duan-kou-liu-cheng.html" rel="alternate"></link><updated>2014-05-13T11:33:00+02:00</updated><author><name>djjsindy</name></author><id>tag:,2014-05-13:socketbang-ding-duan-kou-liu-cheng.html</id><summary type="html">&lt;h1&gt;socket绑定端口过程&lt;/h1&gt;
-&lt;p&gt;绑定端口分为2种，一种是指定端口号，然后内核去判断这个端口号是否可用，另一种是不填端口号，内核去从端口号范围内选择一个端口。具体过程是在inet_csk_get_port函数中。&lt;/p&gt;
+<feed xmlns="http://www.w3.org/2005/Atom"><title>djjsindy</title><link href="/" rel="alternate"></link><link href="/feeds/socket.atom.xml" rel="self"></link><id>/</id><updated>2014-05-19T16:09:00+02:00</updated><entry><title>select函数原理-1</title><link href="/selecthan-shu-yuan-li-1.html" rel="alternate"></link><updated>2014-05-19T16:09:00+02:00</updated><author><name>djjsindy</name></author><id>tag:,2014-05-19:selecthan-shu-yuan-li-1.html</id><summary type="html">&lt;h1&gt;select函数原理-1&lt;/h1&gt;
+&lt;p&gt;select函数大体原理：函数首先会递归每个文件描述符检查事件，如果没有相关的事件，那么就把当前进程添加到wait_queue中，然后改变当前进程的状态，使得进程不会得到时间片，从而使进程休眠；当设备中断，调用相关的驱动的方法，这时会检查wait_queue,然后唤醒相关的进程，这样会导致select进程继续执行，从新检查文件描述符的状态，这时至少有一个事件被激发，这样select函数就会返回了。select函数会顺序检查每个文件描述符的状态，当文件描述符数量十分巨大的情况下，会导致select函数的效率下降。&lt;/p&gt;
+&lt;p&gt;select的核心函数是do_select函数，代码我就不copy了，说下里面必要重要的wait_queue的相关操作，初始化函数是&lt;code&gt;poll_initwait&lt;/code&gt;&lt;/p&gt;
+&lt;p&gt;fs/select.c&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;
+void poll_initwait(struct poll_wqueues *pwq)
+{
+    init_poll_funcptr(&amp;pwq-&gt;pt, __pollwait); //设置wait的时候的处理函数，在需要进程需要休眠的时候调用这个函数
+    pwq-&gt;polling_task = current; //设置休眠的进程
+    pwq-&gt;triggered = 0;
+    pwq-&gt;error = 0;
+    pwq-&gt;table = NULL; //初始化为null，后面有自己分配的地方
+    pwq-&gt;inline_index = 0;
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;&lt;code&gt;do_select&lt;/code&gt;函数第一次会检查一下文件描述符的状态，同时设置好wait_queue触发的状态。&lt;/p&gt;
+&lt;p&gt;file_operations的poll函数是检查一下文件是否有满足的状态，在调用poll函数之前，先设置poll关心的key&lt;/p&gt;
+&lt;p&gt;fs/select.c&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;
+  f_op = file-&gt;f_op;
+  mask = DEFAULT_POLLMASK;
+  if (f_op &amp;&amp; f_op-&gt;poll) {
+    wait_key_set(wait, in, out, bit);
+    mask = (*f_op-&gt;poll)(file, wait);
+  }
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;&lt;code&gt;wait_key_set&lt;/code&gt;就是设置poll关心的key&lt;/p&gt;
+&lt;p&gt;fs/select.c&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;
+static inline void wait_key_set(poll_table *wait, unsigned long in,
+                unsigned long out, unsigned long bit)
+{
+    if (wait) {
+        wait-&gt;key = POLLEX_SET; //无论设置什么key，都需要关心exception状态
+        if (in &amp; bit)
+            wait-&gt;key |= POLLIN_SET;  //设置读事件的key
+        if (out &amp; bit)
+            wait-&gt;key |= POLLOUT_SET; //设置写事件的key
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;&lt;code&gt;f_op-&amp;gt;poll&lt;/code&gt;，考虑网络连接fd，tcp连接，对应&lt;code&gt;tcp_poll&lt;/code&gt;函数，这个函数首先设置wait_queue，然后检查socket状态。首先看下设置wait_queue的函数&lt;code&gt;sock_poll_wait&lt;/code&gt;&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;
+static inline void sock_poll_wait(struct file *filp,
+        wait_queue_head_t *wait_address, poll_table *p)
+{
+    if (p &amp;&amp; wait_address) { //这里wait_address是struct sock中的sk_wq的wait_queue_head_t，可以看出个大概，就是把poll_table中的进程加入到sk_wq的wait_queue中，然后中断处理函数，会找到sock中的wait head，挨个唤醒进程
+        poll_wait(filp, wait_address, p);
+        /*
+         * We need to be sure we are in sync with the
+         * socket flags modification.
+         *
+         * This memory barrier is paired in the wq_has_sleeper.
+        */
+        smp_mb();
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;poll_wait函数调用的就是poll_table中的func函数&lt;/p&gt;
+&lt;p&gt;fs/select.c&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;
+static void __pollwait(struct file *filp, wait_queue_head_t *wait_address,
+                poll_table *p)
+{
+    struct poll_wqueues *pwq = container_of(p, struct poll_wqueues, pt);
+    struct poll_table_entry *entry = poll_get_entry(pwq);  //获得entry
+    if (!entry)
+        return;
+    get_file(filp);
+    entry-&gt;filp = filp; 
+    entry-&gt;wait_address = wait_address;
+    entry-&gt;key = p-&gt;key; //设置关心的key，根据key来唤醒进程
+    init_waitqueue_func_entry(&amp;entry-&gt;wait, pollwake); //设置唤醒回调函数
+    entry-&gt;wait.private = pwq;
+    add_wait_queue(wait_address, &amp;entry-&gt;wait);//加入到sock的wait队列中
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;在创建&lt;code&gt;struct sock&lt;/code&gt;的时候，函数&lt;code&gt;sock_init_data&lt;/code&gt;设置了几个回调函数&lt;/p&gt;
+&lt;p&gt;net/core/sock.c&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;
+    sk-&gt;sk_state_change =   sock_def_wakeup; //连接状态变化
+    sk-&gt;sk_data_ready   =   sock_def_readable; // socket有可读数据
+    sk-&gt;sk_write_space  =   sock_def_write_space; //socket上可以写入数据
+    sk-&gt;sk_error_report =   sock_def_error_report; //socket上有错误
+    sk-&gt;sk_destruct     =   sock_def_destruct;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;这些回调函数都是底层网络驱动通过中断，先把数据提交到网络层，然后提交到传输层，最后调用回调函数来唤醒休眠的进程。具体的回调过程不是这个主题的重点，先不考虑。&lt;/p&gt;
+&lt;p&gt;看下sock_def_readable函数的实现&lt;/p&gt;
+&lt;p&gt;net/core/sock.c&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;
+static void sock_def_readable(struct sock *sk, int len)
+{
+    struct socket_wq *wq;
+
+    rcu_read_lock();
+    wq = rcu_dereference(sk-&gt;sk_wq); //获得等待队列
+    if (wq_has_sleeper(wq))
+        wake_up_interruptible_sync_poll(&amp;wq-&gt;wait, POLLIN | POLLPRI |
+                        POLLRDNORM | POLLRDBAND); //最后的flag匹配entry-&gt;key
+    sk_wake_async(sk, SOCK_WAKE_WAITD, POLL_IN); //异步io，发送信号
+    rcu_read_unlock();
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;最终wake_up_interruptible_sync_poll函数最终会调用到__wake_up_common&lt;/p&gt;
+&lt;p&gt;kernel/sched.c&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;
+tatic void __wake_up_common(wait_queue_head_t *q, unsigned int mode,
+            int nr_exclusive, int wake_flags, void *key)
+{
+    wait_queue_t *curr, *next;
+    //递归每一个挂在sock等待队列中的每一个元素
+    list_for_each_entry_safe(curr, next, &amp;q-&gt;task_list, task_list) {
+        unsigned flags = curr-&gt;flags;
+        //调用wakeup回调函数
+        if (curr-&gt;func(curr, mode, wake_flags, key) &amp;&amp;
+                (flags &amp; WQ_FLAG_EXCLUSIVE) &amp;&amp; !--nr_exclusive)
+            break;
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;这里func是之前注册的回调函数poll_wake函数&lt;/p&gt;
+&lt;p&gt;fs/select.c&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;
+static int pollwake(wait_queue_t *wait, unsigned mode, int sync, void *key)
+{
+    struct poll_table_entry *entry;
+
+    entry = container_of(wait, struct poll_table_entry, wait);
+    //匹配key，如果匹配才唤醒进程，否则退出
+    if (key &amp;&amp; !((unsigned long)key &amp; entry-&gt;key))
+        return 0;
+    return __pollwake(wait, mode, sync, key);
+}
+&lt;/code&gt;&lt;/pre&gt;</summary><category term="socket"></category></entry><entry><title>socket绑定端口流程</title><link href="/socketbang-ding-duan-kou-liu-cheng.html" rel="alternate"></link><updated>2014-05-13T11:33:00+02:00</updated><author><name>djjsindy</name></author><id>tag:,2014-05-13:socketbang-ding-duan-kou-liu-cheng.html</id><summary type="html">&lt;h1&gt;socket绑定端口过程&lt;/h1&gt;
+&lt;p&gt;绑定端口分为2种，一种是指定端口号，然后内核去判断这个端口号是否可用，另一种是填端口号为0，内核去从端口号范围内选择一个端口。具体过程是在inet_csk_get_port函数中，本文中内核版本2.6.39.14&lt;/p&gt;
+&lt;p&gt;先说明一个非常重要的函数inet_csk_bind_conflict，在bind hash找到相同的端口，那么会根据reuseaddr，reuseport和tcp状态来决定这个端口是否是可用。
+&lt;pre&gt;&lt;code&gt;
+inet_get_local_port_range(&amp;amp;low, &amp;amp;high); //首先确定端口号范围
+        remaining = (high - low) + 1;    //表示可以尝试端口号的机会
+        smallest_rover = rover = net_random() % remaining + low;  //从端口号范围内随机选择一个端口号为起点，开始遍历选择&lt;/p&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;    &lt;span class="n"&gt;smallest_size&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;  &lt;span class="c1"&gt;//如果没有可用的端口号，会选择被reuse最少的端口号&lt;/span&gt;
+    &lt;span class="k"&gt;do&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+        &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;inet_is_reserved_local_port&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;rover&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt;&lt;span class="c1"&gt;//如果这个随机端口号是保留的，那么不考虑&lt;/span&gt;
+            &lt;span class="k"&gt;goto&lt;/span&gt; &lt;span class="n"&gt;next_nolock&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+            &lt;span class="c1"&gt;//这里bhash是绑定端口号的hash结构，net是网络命名空间，暂时不考虑，rover是端口参考值，这里计算参考值的hash index，struct inet_bind_bucket是hash的元素，这里取hash位置的双链表的head指针&lt;/span&gt;
+        &lt;span class="n"&gt;head&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;hashinfo&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;bhash&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="n"&gt;inet_bhashfn&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;net&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;rover&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
+                &lt;span class="n"&gt;hashinfo&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;bhash_size&lt;/span&gt;&lt;span class="p"&gt;)];&lt;/span&gt; 
+        &lt;span class="n"&gt;spin_lock&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;head&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;lock&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+        &lt;span class="c1"&gt;//遍历双链表，寻找rover的记录，如果没有找到，那就是可用的端口，如果找到了，判断状态来决定端口是否可用&lt;/span&gt;
+        &lt;span class="n"&gt;inet_bind_bucket_for_each&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;tb&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;node&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;head&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;chain&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+            &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;net_eq&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;ib_net&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;tb&lt;/span&gt;&lt;span class="p"&gt;),&lt;/span&gt; &lt;span class="n"&gt;net&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class="n"&gt;tb&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;port&lt;/span&gt; &lt;span class="o"&gt;==&lt;/span&gt; &lt;span class="n"&gt;rover&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+            &lt;span class="c1"&gt;//如果已经绑定的socket设置了reuse，同时当前socket设置了reuse，当前socket状态不是listen状态，同时这个端口的可重用的阈值是最小的，或重用阈值为-1（初始阈值），目的是找到端口重用度最小的阈值的那个端口&lt;/span&gt;
+                &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;tb&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;fastreuse&lt;/span&gt; &lt;span class="o"&gt;&amp;gt;&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&amp;amp;&lt;/span&gt;
+                    &lt;span class="n"&gt;sk&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;sk_reuse&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&amp;amp;&lt;/span&gt;
+                    &lt;span class="n"&gt;sk&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;sk_state&lt;/span&gt; &lt;span class="o"&gt;!=&lt;/span&gt; &lt;span class="n"&gt;TCP_LISTEN&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&amp;amp;&lt;/span&gt;
+                    &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;tb&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;num_owners&lt;/span&gt; &lt;span class="o"&gt;&amp;lt;&lt;/span&gt; &lt;span class="n"&gt;smallest_size&lt;/span&gt; &lt;span class="o"&gt;||&lt;/span&gt; &lt;span class="n"&gt;smallest_size&lt;/span&gt; &lt;span class="o"&gt;==&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+                    &lt;span class="c1"&gt;//更新阈值&lt;/span&gt;
+                    &lt;span class="n"&gt;smallest_size&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;tb&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;num_owners&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+                    &lt;span class="n"&gt;smallest_rover&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;rover&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;&lt;span class="c1"&gt;//保存这个最小阈值的端口&lt;/span&gt;
+                    &lt;span class="c1"&gt;//如果端口bind hash已经有了足够多的绑定端口，那么当前端口就是备选。避免了遍历数量很多的bind hash，这个应该是内核中的一个小小的优化吧。以前的版本没看过&lt;/span&gt;
+                    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;atomic_read&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;hashinfo&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;bsockets&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="o"&gt;&amp;gt;&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;high&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt; &lt;span class="n"&gt;low&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="o"&gt;+&lt;/span&gt; &lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+                        &lt;span class="n"&gt;spin_unlock&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;head&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;lock&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+                        &lt;span class="n"&gt;snum&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;smallest_rover&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+                        &lt;span class="k"&gt;goto&lt;/span&gt; &lt;span class="n"&gt;have_snum&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+                    &lt;span class="p"&gt;}&lt;/span&gt;
+                &lt;span class="p"&gt;}&lt;/span&gt;
+                &lt;span class="k"&gt;goto&lt;/span&gt; &lt;span class="n"&gt;next&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+            &lt;span class="p"&gt;}&lt;/span&gt;
+        &lt;span class="c1"&gt;//到了这里表示端口已经找到并且这个端口&lt;/span&gt;
+        &lt;span class="k"&gt;break&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="nl"&gt;next:&lt;/span&gt;
+        &lt;span class="n"&gt;spin_unlock&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;head&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;lock&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+    &lt;span class="nl"&gt;next_nolock:&lt;/span&gt;
+        &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;++&lt;/span&gt;&lt;span class="n"&gt;rover&lt;/span&gt; &lt;span class="o"&gt;&amp;gt;&lt;/span&gt; &lt;span class="n"&gt;high&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+            &lt;span class="n"&gt;rover&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;low&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="p"&gt;}&lt;/span&gt; &lt;span class="k"&gt;while&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;--&lt;/span&gt;&lt;span class="n"&gt;remaining&lt;/span&gt; &lt;span class="o"&gt;&amp;gt;&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
+
+    &lt;span class="cm"&gt;/* Exhausted local port range during search?  It is not&lt;/span&gt;
+&lt;span class="cm"&gt;     * possible for us to be holding one of the bind hash&lt;/span&gt;
+&lt;span class="cm"&gt;     * locks if this test triggers, because if &amp;#39;remaining&amp;#39;&lt;/span&gt;
+&lt;span class="cm"&gt;     * drops to zero, we broke out of the do/while loop at&lt;/span&gt;
+&lt;span class="cm"&gt;     * the top level, not from the &amp;#39;break;&amp;#39; statement.&lt;/span&gt;
+&lt;span class="cm"&gt;     */&lt;/span&gt;
+     &lt;span class="c1"&gt;//已经遍历了一遍了，如果阈值（smallest_rover）还是-1，那么证明所有端口都被占用，同时都为设置reuse，那么只能失败了，否则使用reuse占用最少的端口，这种情况也是端口都被占用，但是有一些是reuse的，并且当前的端口是reuse的。&lt;/span&gt;
+    &lt;span class="n"&gt;ret&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;remaining&lt;/span&gt; &lt;span class="o"&gt;&amp;lt;=&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+        &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;smallest_size&lt;/span&gt; &lt;span class="o"&gt;!=&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+            &lt;span class="n"&gt;snum&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;smallest_rover&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+            &lt;span class="k"&gt;goto&lt;/span&gt; &lt;span class="n"&gt;have_snum&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+        &lt;span class="p"&gt;}&lt;/span&gt;
+        &lt;span class="k"&gt;goto&lt;/span&gt; &lt;span class="n"&gt;fail&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+    &lt;span class="p"&gt;}&lt;/span&gt;
+    &lt;span class="cm"&gt;/* OK, here is the one we will use.  HEAD is&lt;/span&gt;
+&lt;span class="cm"&gt;     * non-NULL and we hold it&amp;#39;s mutex.&lt;/span&gt;
+&lt;span class="cm"&gt;     */&lt;/span&gt;
+    &lt;span class="n"&gt;snum&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;rover&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
+&lt;/pre&gt;&lt;/div&gt;
+
+
+&lt;p&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/p&gt;
 &lt;p&gt;1.未指定端口号&lt;/p&gt;
 &lt;p&gt;net/ipv4/inet_connection_sock.c&lt;/p&gt;
 &lt;pre&gt;&lt;code&gt;
-        inet_get_local_port_range(&amp;low, &amp;high); //首先确定端口号范围
-        remaining = (high - low) + 1;    //表示可以尝试端口号的机会
-        smallest_rover = rover = net_random() % remaining + low;  //从端口号范围内随机选择一个端口号为起点，开始遍历选择
-
-        smallest_size = -1;  //如果没有可用的端口号，会选择被reuse最少的端口号
+        //首先确定端口号范围
+        inet_get_local_port_range(net, &amp;low, &amp;high);
+        //表示可以尝试端口号的机会
+        remaining = (high - low) + 1;
+        //从端口号范围内随机选择一个端口号为起点，开始遍历选择
+        smallest_rover = rover = prandom_u32() % remaining + low;
+        //如果没有可用的端口号，会选择被reuse最少的端口号
+        smallest_size = -1;
         do {
-            if (inet_is_reserved_local_port(rover))//如果这个随机端口号是保留的，那么不考虑
+            //如果这个随机端口号是保留的，那么不考虑
+            if (inet_is_reserved_local_port(rover))
                 goto next_nolock;
-                //这里bhash是绑定端口号的hash结构，net是网络命名空间，暂时不考虑，rover是端口参考值，这里计算参考值的hash index，struct inet_bind_bucket是hash的元素，这里取hash位置的双链表的head指针
+            //这里bhash是绑定端口号的hash结构，net是网络命名空间，暂时不考虑，rover是端口参考值，这里计算参考值的hash index，struct inet_bind_bucket是hash的元素，这里取hash位置的双链表的head指针
             head = &amp;hashinfo-&gt;bhash[inet_bhashfn(net, rover,
-                    hashinfo-&gt;bhash_size)]; 
+                    hashinfo-&gt;bhash_size)];
             spin_lock(&amp;head-&gt;lock);
             //遍历双链表，寻找rover的记录，如果没有找到，那就是可用的端口，如果找到了，判断状态来决定端口是否可用
-            inet_bind_bucket_for_each(tb, node, &amp;head-&gt;chain)
+            inet_bind_bucket_for_each(tb, &amp;head-&gt;chain)
+                //如果已经绑定的端口在同一命名空间中，端口是当前随机端口
                 if (net_eq(ib_net(tb), net) &amp;&amp; tb-&gt;port == rover) {
-                //如果已经绑定的socket设置了reuse，同时当前socket设置了reuse，当前socket状态不是listen状态，同时这个端口的可重用的阈值是最小的，或重用阈值为-1（初始阈值），目的是找到端口重用度最小的阈值的那个端口
-                    if (tb-&gt;fastreuse &gt; 0 &amp;&amp;
-                        sk-&gt;sk_reuse &amp;&amp;
-                        sk-&gt;sk_state != TCP_LISTEN &amp;&amp;
+                    //如果tb和sk同时设置了reuse，sk状态不是listen或者reuseport，同时这个端口的重用阈值未设置，或者小于阈值，那么这个端口作为备选
+                    if (((tb-&gt;fastreuse &gt; 0 &amp;&amp; sk-&gt;sk_reuse &amp;&amp; sk-&gt;sk_state != TCP_LISTEN)||(tb-&gt;fastreuseport &gt; 0 &amp;&amp;sk-&gt;sk_reuseport &amp;&amp;uid_eq(tb-&gt;fastuid, uid))) &amp;&amp;
                         (tb-&gt;num_owners &lt; smallest_size || smallest_size == -1)) {
-                        //更新阈值
                         smallest_size = tb-&gt;num_owners;
-                        smallest_rover = rover;//保存这个最小阈值的端口
-                        //如果端口bind hash已经有了足够多的绑定端口，那么当前端口就是备选。避免了遍历数量很多的bind hash，这个应该是内核中的一个小小的优化吧。以前的版本没看过
-                        if (atomic_read(&amp;hashinfo-&gt;bsockets) &gt; (high - low) + 1) {
-                            spin_unlock(&amp;head-&gt;lock);
+                        smallest_rover = rover;
+                        //如果hashinfo中的bind到了一定的数量，就挑选当前重用度最低的端口
+                        if (atomic_read(&amp;hashinfo-&gt;bsockets) &gt; (high - low) + 1 &amp;&amp;
+                            !inet_csk(sk)-&gt;icsk_af_ops-&gt;bind_conflict(sk, tb, false)) {
                             snum = smallest_rover;
-                            goto have_snum;
+                            goto tb_found;
                         }
+                    }
+                    if (!inet_csk(sk)-&gt;icsk_af_ops-&gt;bind_conflict(sk, tb, false)) {
+                        snum = rover;
+                        goto tb_found;
                     }
                     goto next;
                 }
-            //到了这里表示端口已经找到并且这个端口
+            //找到了未绑定的端口就退出
             break;
         next:
             spin_unlock(&amp;head-&gt;lock);
@@ -51,7 +263,6 @@
          * drops to zero, we broke out of the do/while loop at
          * the top level, not from the 'break;' statement.
          */
-         //已经遍历了一遍了，如果阈值（smallest_rover）还是-1，那么证明所有端口都被占用，同时都为设置reuse，那么只能失败了，否则使用reuse占用最少的端口，这种情况也是端口都被占用，但是有一些是reuse的，并且当前的端口是reuse的。
         ret = 1;
         if (remaining &lt;= 0) {
             if (smallest_size != -1) {
@@ -185,51 +396,7 @@ void inet_bind_hash(struct sock *sk, struct inet_bind_bucket *tb,
     inet_csk(sk)-&gt;icsk_bind_hash = tb;
 }
 &lt;/code&gt;&lt;/pre&gt;</summary><category term="socket"></category></entry><entry><title>socket创建流程2</title><link href="/socketchuang-jian-liu-cheng-2.html" rel="alternate"></link><updated>2014-05-09T15:14:00+02:00</updated><author><name>djjsindy</name></author><id>tag:,2014-05-09:socketchuang-jian-liu-cheng-2.html</id><summary type="html">&lt;h1&gt;socket创建流程2&lt;/h1&gt;
-&lt;p&gt;linux内核创建socket时，会初始化&lt;code&gt;struct sock&lt;/code&gt;，这个结构体主要保存连接状态，相关协议回调函数，主要初始化函数时sock_init_data&lt;/p&gt;
-&lt;p&gt;net/ipv4/sock.c
-&lt;pre&gt;&lt;code&gt;
-void sock_init_data(struct socket &lt;em&gt;sock, struct sock &lt;/em&gt;sk)
-{
-    skb_queue_head_init(&amp;amp;sk-&amp;gt;sk_receive_queue);  //网曾
-    skb_queue_head_init(&amp;amp;sk-&amp;gt;sk_write_queue);
-    skb_queue_head_init(&amp;amp;sk-&amp;gt;sk_error_queue);
- #ifdef CONFIG_NET_DMA
-    skb_queue_head_init(&amp;amp;sk-&amp;gt;sk_async_wait_queue);
- #endif
-    sk-&amp;gt;sk_send_head    =   NULL;
-    init_timer(&amp;amp;sk-&amp;gt;sk_timer);
-    sk-&amp;gt;sk_allocation   =   GFP_KERNEL;
-    sk-&amp;gt;sk_rcvbuf       =   sysctl_rmem_default;
-    sk-&amp;gt;sk_sndbuf       =   sysctl_wmem_default;
-    sk-&amp;gt;sk_state        =   TCP_CLOSE;
-    sk_set_socket(sk, sock);
-    sock_set_flag(sk, SOCK_ZAPPED);
-    if (sock) {
-        sk-&amp;gt;sk_type =   sock-&amp;gt;type;
-        sk-&amp;gt;sk_wq   =   sock-&amp;gt;wq;
-        sock-&amp;gt;sk    =   sk;
-    } else
-        sk-&amp;gt;sk_wq   =   NULL;
-    spin_lock_init(&amp;amp;sk-&amp;gt;sk_dst_lock);
-    rwlock_init(&amp;amp;sk-&amp;gt;sk_callback_lock);
-    lockdep_set_class_and_name(&amp;amp;sk-&amp;gt;sk_callback_lock,
-            af_callback_keys + sk-&amp;gt;sk_family,
-            af_family_clock_key_strings[sk-&amp;gt;sk_family]);
-    sk-&amp;gt;sk_state_change =   sock_def_wakeup;
-    sk-&amp;gt;sk_data_ready   =   sock_def_readable;
-    sk-&amp;gt;sk_write_space  =   sock_def_write_space;
-    sk-&amp;gt;sk_error_report =   sock_def_error_report;
-    sk-&amp;gt;sk_destruct     =   sock_def_destruct;
-    sk-&amp;gt;sk_sndmsg_page  =   NULL;
-    sk-&amp;gt;sk_sndmsg_off   =   0;
-    sk-&amp;gt;sk_peer_pid     =   NULL;
-    sk-&amp;gt;sk_peer_cred    =   NULL;
-    sk-&amp;gt;sk_write_pending    =   0;
-    sk-&amp;gt;sk_rcvlowat     =   1;
-    sk-&amp;gt;sk_rcvtimeo     =   MAX_SCHEDULE_TIMEOUT;
-    sk-&amp;gt;sk_sndtimeo     =   MAX_SCHEDULE_TIMEOUT;
-    sk-&amp;gt;sk_stamp = ktime_set(-1L, 0);
-&lt;/code&gt;&lt;/pre&gt;&lt;/p&gt;</summary><category term="socket"></category></entry><entry><title>socket创建流程1</title><link href="/socketchuang-jian-liu-cheng-1.html" rel="alternate"></link><updated>2014-05-09T10:49:00+02:00</updated><author><name>djjsindy</name></author><id>tag:,2014-05-09:socketchuang-jian-liu-cheng-1.html</id><summary type="html">&lt;h1&gt;socket创建流程1&lt;/h1&gt;
+&lt;p&gt;linux内核创建socket时，会初始化&lt;code&gt;struct sock&lt;/code&gt;，后面针对net family的不通和protocol的不同，对&lt;code&gt;struct sock&lt;/code&gt;有多种扩展，主要的扩展图如下：&lt;/p&gt;</summary><category term="socket"></category></entry><entry><title>socket创建流程1</title><link href="/socketchuang-jian-liu-cheng-1.html" rel="alternate"></link><updated>2014-05-09T10:49:00+02:00</updated><author><name>djjsindy</name></author><id>tag:,2014-05-09:socketchuang-jian-liu-cheng-1.html</id><summary type="html">&lt;h1&gt;socket创建流程1&lt;/h1&gt;
 &lt;p&gt;linux内核在系统初始化的过程中，会对支持的多个协议组进行初始化，例如ipv4，ipv6，unix域协议。这些协议的结构体通过&lt;code&gt;sock_register&lt;/code&gt;放在一个&lt;code&gt;net_families&lt;/code&gt;的数组中。&lt;/p&gt;
 &lt;p&gt;&lt;img src="https://lh5.googleusercontent.com/-fdHJThfthJ0/U2tXrsCfNjI/AAAAAAAAAPk/xtrusNqcVis/s1024/Screen%2520Shot%25202014-05-08%2520at%25206.07.45%2520PM.png" width="600"&gt;&lt;/p&gt;
 &lt;p&gt;linux内核在初始化过程中，会调用inet_init函数，前半部分重要的代码：&lt;/p&gt;
