@@ -297,58 +297,42 @@ static inline unsigned int inet_csk_listen_poll(const struct sock *sk)
         mask |= POLLHUP;
     //读关闭，触发读事件
     if (sk-&gt;sk_shutdown &amp; RCV_SHUTDOWN)
-        mask |= POLLIN | POLLRDNORM | POLLRDHUP;</p>
-<div class="highlight"><pre><span class="cm">/* Connected? */</span>
-<span class="c1">//如果当前socket状态不是sync sent或者sync recv</span>
-<span class="k">if</span> <span class="p">((</span><span class="mh">1</span> <span class="o">&lt;&lt;</span> <span class="n">sk</span><span class="o">-&gt;</span><span class="n">sk_state</span><span class="p">)</span> <span class="o">&amp;</span> <span class="o">~</span><span class="p">(</span><span class="no">TCPF_SYN_SENT</span> <span class="o">|</span> <span class="no">TCPF_SYN_RECV</span><span class="p">))</span> <span class="p">{</span>
-    <span class="c1">//获得读水位</span>
-    <span class="k">int</span> <span class="n">target</span> <span class="o">=</span> <span class="n">sock_rcvlowat</span><span class="p">(</span><span class="n">sk</span><span class="p">,</span> <span class="mh">0</span><span class="p">,</span> <span class="no">INT_MAX</span><span class="p">);</span>
-
-    <span class="k">if</span> <span class="p">(</span><span class="n">tp</span><span class="o">-&gt;</span><span class="n">urg_seq</span> <span class="o">==</span> <span class="n">tp</span><span class="o">-&gt;</span><span class="n">copied_seq</span> <span class="o">&amp;&amp;</span>
-        <span class="o">!</span><span class="n">sock_flag</span><span class="p">(</span><span class="n">sk</span><span class="p">,</span> <span class="no">SOCK_URGINLINE</span><span class="p">)</span> <span class="o">&amp;&amp;</span>
-        <span class="n">tp</span><span class="o">-&gt;</span><span class="n">urg_data</span><span class="p">)</span>
-        <span class="n">target</span><span class="o">++</span><span class="p">;</span>
-
-    <span class="cm">/* Potential race condition. If read of tp below will</span>
-<span class="cm">     * escape above sk-&gt;sk_state, we can be illegally awaken</span>
-<span class="cm">     * in SYN_* states. */</span>
-     <span class="c1">//如果有数据超过了水位线,触发读事件</span>
-    <span class="k">if</span> <span class="p">(</span><span class="n">tp</span><span class="o">-&gt;</span><span class="n">rcv_nxt</span> <span class="o">-</span> <span class="n">tp</span><span class="o">-&gt;</span><span class="n">copied_seq</span> <span class="o">&gt;=</span> <span class="n">target</span><span class="p">)</span>
-        <span class="n">mask</span> <span class="o">|=</span> <span class="no">POLLIN</span> <span class="o">|</span> <span class="no">POLLRDNORM</span><span class="p">;</span>
-    <span class="c1">//如果不是写半关闭</span>
-    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="p">(</span><span class="n">sk</span><span class="o">-&gt;</span><span class="n">sk_shutdown</span> <span class="o">&amp;</span> <span class="no">SEND_SHUTDOWN</span><span class="p">))</span> <span class="p">{</span>
-        <span class="c1">//如果有写的空间，触发写事件</span>
-        <span class="k">if</span> <span class="p">(</span><span class="n">sk_stream_wspace</span><span class="p">(</span><span class="n">sk</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">sk_stream_min_wspace</span><span class="p">(</span><span class="n">sk</span><span class="p">))</span> <span class="p">{</span>
-            <span class="n">mask</span> <span class="o">|=</span> <span class="no">POLLOUT</span> <span class="o">|</span> <span class="no">POLLWRNORM</span><span class="p">;</span>
-        <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>  <span class="cm">/* send SIGIO later */</span>
-            <span class="n">set_bit</span><span class="p">(</span><span class="no">SOCK_ASYNC_NOSPACE</span><span class="p">,</span>
-                <span class="o">&amp;</span><span class="n">sk</span><span class="o">-&gt;</span><span class="n">sk_socket</span><span class="o">-&gt;</span><span class="n">flags</span><span class="p">);</span>
-            <span class="n">set_bit</span><span class="p">(</span><span class="no">SOCK_NOSPACE</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">sk</span><span class="o">-&gt;</span><span class="n">sk_socket</span><span class="o">-&gt;</span><span class="n">flags</span><span class="p">);</span>
-
-            <span class="cm">/* Race breaker. If space is freed after</span>
-<span class="cm">             * wspace test but before the flags are set,</span>
-<span class="cm">             * IO signal will be lost.</span>
-<span class="cm">             */</span>
-            <span class="k">if</span> <span class="p">(</span><span class="n">sk_stream_wspace</span><span class="p">(</span><span class="n">sk</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">sk_stream_min_wspace</span><span class="p">(</span><span class="n">sk</span><span class="p">))</span>
-                <span class="n">mask</span> <span class="o">|=</span> <span class="no">POLLOUT</span> <span class="o">|</span> <span class="no">POLLWRNORM</span><span class="p">;</span>
-        <span class="p">}</span>
-    <span class="p">}</span> <span class="k">else</span>
-        <span class="c1">//写半关闭触发写事件</span>
-        <span class="n">mask</span> <span class="o">|=</span> <span class="no">POLLOUT</span> <span class="o">|</span> <span class="no">POLLWRNORM</span><span class="p">;</span>
-
-    <span class="k">if</span> <span class="p">(</span><span class="n">tp</span><span class="o">-&gt;</span><span class="n">urg_data</span> <span class="o">&amp;</span> <span class="no">TCP_URG_VALID</span><span class="p">)</span>
-        <span class="n">mask</span> <span class="o">|=</span> <span class="no">POLLPRI</span><span class="p">;</span>
-<span class="p">}</span>
-<span class="cm">/* This barrier is coupled with smp_wmb() in tcp_reset() */</span>
-<span class="n">smp_rmb</span><span class="p">();</span>
-<span class="k">if</span> <span class="p">(</span><span class="n">sk</span><span class="o">-&gt;</span><span class="n">sk_err</span><span class="p">)</span>
-    <span class="n">mask</span> <span class="o">|=</span> <span class="no">POLLERR</span><span class="p">;</span>
-
-<span class="k">return</span> <span class="n">mask</span><span class="p">;</span>
-</pre></div>
-
-
-<p></code></pre></p>
+        mask |= POLLIN | POLLRDNORM | POLLRDHUP;
+    //如果当前socket状态不是sync sent或者sync recv
+    if ((1 &lt;&lt; sk-&gt;sk_state) &amp; ~(TCPF_SYN_SENT | TCPF_SYN_RECV)) {
+        //获得读水位
+        int target = sock_rcvlowat(sk, 0, INT_MAX);
+        if (tp-&gt;urg_seq == tp-&gt;copied_seq &amp;&amp;
+            !sock_flag(sk, SOCK_URGINLINE) &amp;&amp;
+            tp-&gt;urg_data)
+            target++;
+            //如果有数据超过了水位线,触发读事件
+        if (tp-&gt;rcv_nxt - tp-&gt;copied_seq &gt;= target)
+            mask |= POLLIN | POLLRDNORM;
+        //如果不是写半关闭
+        if (!(sk-&gt;sk_shutdown &amp; SEND_SHUTDOWN)) {
+            //如果有写的空间，触发写事件
+            if (sk_stream_wspace(sk) &gt;= sk_stream_min_wspace(sk)) {
+                mask |= POLLOUT | POLLWRNORM;
+            } else {<br />
+                set_bit(SOCK_ASYNC_NOSPACE,
+                    &amp;sk-&gt;sk_socket-&gt;flags);
+                set_bit(SOCK_NOSPACE, &amp;sk-&gt;sk_socket-&gt;flags);
+                if (sk_stream_wspace(sk) &gt;= sk_stream_min_wspace(sk))
+                    mask |= POLLOUT | POLLWRNORM;
+            }
+        } else
+            //写半关闭触发写事件
+            mask |= POLLOUT | POLLWRNORM;
+        if (tp-&gt;urg_data &amp; TCP_URG_VALID)
+            mask |= POLLPRI;
+    }
+    /<em> This barrier is coupled with smp_wmb() in tcp_reset() </em>/
+    smp_rmb();
+    if (sk-&gt;sk_err)
+        mask |= POLLERR;
+    return mask;
+</code></pre></p>
                 </div><!-- /.entry-content -->
         </article>
 </section>
@@ -380,16 +364,6 @@ static inline unsigned int inet_csk_listen_poll(const struct sock *sk)
 </li>
 
 <li class="nav-header"><h4><i class="icon-tags icon-large"></i>Tags</h4></li>
-<li class="tag-1">
-    <a href="/tag/socket.html">
-        <i class="icon-tag icon-large"></i>socket
-    </a>
-</li>
-<li class="tag-1">
-    <a href="/tag/nginx.html">
-        <i class="icon-tag icon-large"></i>nginx
-    </a>
-</li>
 <li class="tag-2">
     <a href="/tag/tomcat.html">
         <i class="icon-tag icon-large"></i>tomcat
@@ -398,6 +372,16 @@ static inline unsigned int inet_csk_listen_poll(const struct sock *sk)
 <li class="tag-1">
     <a href="/tag/ptmalloc.html">
         <i class="icon-tag icon-large"></i>ptmalloc
+    </a>
+</li>
+<li class="tag-1">
+    <a href="/tag/socket.html">
+        <i class="icon-tag icon-large"></i>socket
+    </a>
+</li>
+<li class="tag-1">
+    <a href="/tag/nginx.html">
+        <i class="icon-tag icon-large"></i>nginx
     </a>
 </li>
 

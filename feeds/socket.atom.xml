@@ -170,58 +170,42 @@ static inline unsigned int inet_csk_listen_poll(const struct sock *sk)
         mask |= POLLHUP;
     //读关闭，触发读事件
     if (sk-&amp;gt;sk_shutdown &amp;amp; RCV_SHUTDOWN)
-        mask |= POLLIN | POLLRDNORM | POLLRDHUP;&lt;/p&gt;
-&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="cm"&gt;/* Connected? */&lt;/span&gt;
-&lt;span class="c1"&gt;//如果当前socket状态不是sync sent或者sync recv&lt;/span&gt;
-&lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;((&lt;/span&gt;&lt;span class="mh"&gt;1&lt;/span&gt; &lt;span class="o"&gt;&amp;lt;&amp;lt;&lt;/span&gt; &lt;span class="n"&gt;sk&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;sk_state&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="o"&gt;~&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="no"&gt;TCPF_SYN_SENT&lt;/span&gt; &lt;span class="o"&gt;|&lt;/span&gt; &lt;span class="no"&gt;TCPF_SYN_RECV&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
-    &lt;span class="c1"&gt;//获得读水位&lt;/span&gt;
-    &lt;span class="k"&gt;int&lt;/span&gt; &lt;span class="n"&gt;target&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;sock_rcvlowat&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;sk&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="mh"&gt;0&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="no"&gt;INT_MAX&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
-
-    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;tp&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;urg_seq&lt;/span&gt; &lt;span class="o"&gt;==&lt;/span&gt; &lt;span class="n"&gt;tp&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;copied_seq&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&amp;amp;&lt;/span&gt;
-        &lt;span class="o"&gt;!&lt;/span&gt;&lt;span class="n"&gt;sock_flag&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;sk&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="no"&gt;SOCK_URGINLINE&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&amp;amp;&lt;/span&gt;
-        &lt;span class="n"&gt;tp&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;urg_data&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
-        &lt;span class="n"&gt;target&lt;/span&gt;&lt;span class="o"&gt;++&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-
-    &lt;span class="cm"&gt;/* Potential race condition. If read of tp below will&lt;/span&gt;
-&lt;span class="cm"&gt;     * escape above sk-&amp;gt;sk_state, we can be illegally awaken&lt;/span&gt;
-&lt;span class="cm"&gt;     * in SYN_* states. */&lt;/span&gt;
-     &lt;span class="c1"&gt;//如果有数据超过了水位线,触发读事件&lt;/span&gt;
-    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;tp&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;rcv_nxt&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt; &lt;span class="n"&gt;tp&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;copied_seq&lt;/span&gt; &lt;span class="o"&gt;&amp;gt;=&lt;/span&gt; &lt;span class="n"&gt;target&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
-        &lt;span class="n"&gt;mask&lt;/span&gt; &lt;span class="o"&gt;|=&lt;/span&gt; &lt;span class="no"&gt;POLLIN&lt;/span&gt; &lt;span class="o"&gt;|&lt;/span&gt; &lt;span class="no"&gt;POLLRDNORM&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-    &lt;span class="c1"&gt;//如果不是写半关闭&lt;/span&gt;
-    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;!&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;sk&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;sk_shutdown&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="no"&gt;SEND_SHUTDOWN&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
-        &lt;span class="c1"&gt;//如果有写的空间，触发写事件&lt;/span&gt;
-        &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;sk_stream_wspace&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;sk&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="o"&gt;&amp;gt;=&lt;/span&gt; &lt;span class="n"&gt;sk_stream_min_wspace&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;sk&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
-            &lt;span class="n"&gt;mask&lt;/span&gt; &lt;span class="o"&gt;|=&lt;/span&gt; &lt;span class="no"&gt;POLLOUT&lt;/span&gt; &lt;span class="o"&gt;|&lt;/span&gt; &lt;span class="no"&gt;POLLWRNORM&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-        &lt;span class="p"&gt;}&lt;/span&gt; &lt;span class="k"&gt;else&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;  &lt;span class="cm"&gt;/* send SIGIO later */&lt;/span&gt;
-            &lt;span class="n"&gt;set_bit&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="no"&gt;SOCK_ASYNC_NOSPACE&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
-                &lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;sk&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;sk_socket&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;flags&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
-            &lt;span class="n"&gt;set_bit&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="no"&gt;SOCK_NOSPACE&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;sk&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;sk_socket&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;flags&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
-
-            &lt;span class="cm"&gt;/* Race breaker. If space is freed after&lt;/span&gt;
-&lt;span class="cm"&gt;             * wspace test but before the flags are set,&lt;/span&gt;
-&lt;span class="cm"&gt;             * IO signal will be lost.&lt;/span&gt;
-&lt;span class="cm"&gt;             */&lt;/span&gt;
-            &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;sk_stream_wspace&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;sk&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="o"&gt;&amp;gt;=&lt;/span&gt; &lt;span class="n"&gt;sk_stream_min_wspace&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;sk&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt;
-                &lt;span class="n"&gt;mask&lt;/span&gt; &lt;span class="o"&gt;|=&lt;/span&gt; &lt;span class="no"&gt;POLLOUT&lt;/span&gt; &lt;span class="o"&gt;|&lt;/span&gt; &lt;span class="no"&gt;POLLWRNORM&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-        &lt;span class="p"&gt;}&lt;/span&gt;
-    &lt;span class="p"&gt;}&lt;/span&gt; &lt;span class="k"&gt;else&lt;/span&gt;
-        &lt;span class="c1"&gt;//写半关闭触发写事件&lt;/span&gt;
-        &lt;span class="n"&gt;mask&lt;/span&gt; &lt;span class="o"&gt;|=&lt;/span&gt; &lt;span class="no"&gt;POLLOUT&lt;/span&gt; &lt;span class="o"&gt;|&lt;/span&gt; &lt;span class="no"&gt;POLLWRNORM&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-
-    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;tp&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;urg_data&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="no"&gt;TCP_URG_VALID&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
-        &lt;span class="n"&gt;mask&lt;/span&gt; &lt;span class="o"&gt;|=&lt;/span&gt; &lt;span class="no"&gt;POLLPRI&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-&lt;span class="p"&gt;}&lt;/span&gt;
-&lt;span class="cm"&gt;/* This barrier is coupled with smp_wmb() in tcp_reset() */&lt;/span&gt;
-&lt;span class="n"&gt;smp_rmb&lt;/span&gt;&lt;span class="p"&gt;();&lt;/span&gt;
-&lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;sk&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;sk_err&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
-    &lt;span class="n"&gt;mask&lt;/span&gt; &lt;span class="o"&gt;|=&lt;/span&gt; &lt;span class="no"&gt;POLLERR&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-
-&lt;span class="k"&gt;return&lt;/span&gt; &lt;span class="n"&gt;mask&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;p&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/p&gt;</summary><category term="socket"></category></entry><entry><title>socket绑定端口流程</title><link href="/socketbang-ding-duan-kou-liu-cheng.html" rel="alternate"></link><updated>2014-05-13T11:33:00+02:00</updated><author><name>djjsindy</name></author><id>tag:,2014-05-13:socketbang-ding-duan-kou-liu-cheng.html</id><summary type="html">&lt;h1&gt;socket绑定端口过程&lt;/h1&gt;
+        mask |= POLLIN | POLLRDNORM | POLLRDHUP;
+    //如果当前socket状态不是sync sent或者sync recv
+    if ((1 &amp;lt;&amp;lt; sk-&amp;gt;sk_state) &amp;amp; ~(TCPF_SYN_SENT | TCPF_SYN_RECV)) {
+        //获得读水位
+        int target = sock_rcvlowat(sk, 0, INT_MAX);
+        if (tp-&amp;gt;urg_seq == tp-&amp;gt;copied_seq &amp;amp;&amp;amp;
+            !sock_flag(sk, SOCK_URGINLINE) &amp;amp;&amp;amp;
+            tp-&amp;gt;urg_data)
+            target++;
+            //如果有数据超过了水位线,触发读事件
+        if (tp-&amp;gt;rcv_nxt - tp-&amp;gt;copied_seq &amp;gt;= target)
+            mask |= POLLIN | POLLRDNORM;
+        //如果不是写半关闭
+        if (!(sk-&amp;gt;sk_shutdown &amp;amp; SEND_SHUTDOWN)) {
+            //如果有写的空间，触发写事件
+            if (sk_stream_wspace(sk) &amp;gt;= sk_stream_min_wspace(sk)) {
+                mask |= POLLOUT | POLLWRNORM;
+            } else {&lt;br /&gt;
+                set_bit(SOCK_ASYNC_NOSPACE,
+                    &amp;amp;sk-&amp;gt;sk_socket-&amp;gt;flags);
+                set_bit(SOCK_NOSPACE, &amp;amp;sk-&amp;gt;sk_socket-&amp;gt;flags);
+                if (sk_stream_wspace(sk) &amp;gt;= sk_stream_min_wspace(sk))
+                    mask |= POLLOUT | POLLWRNORM;
+            }
+        } else
+            //写半关闭触发写事件
+            mask |= POLLOUT | POLLWRNORM;
+        if (tp-&amp;gt;urg_data &amp;amp; TCP_URG_VALID)
+            mask |= POLLPRI;
+    }
+    /&lt;em&gt; This barrier is coupled with smp_wmb() in tcp_reset() &lt;/em&gt;/
+    smp_rmb();
+    if (sk-&amp;gt;sk_err)
+        mask |= POLLERR;
+    return mask;
+&lt;/code&gt;&lt;/pre&gt;&lt;/p&gt;</summary><category term="socket"></category></entry><entry><title>socket绑定端口流程</title><link href="/socketbang-ding-duan-kou-liu-cheng.html" rel="alternate"></link><updated>2014-05-13T11:33:00+02:00</updated><author><name>djjsindy</name></author><id>tag:,2014-05-13:socketbang-ding-duan-kou-liu-cheng.html</id><summary type="html">&lt;h1&gt;socket绑定端口过程&lt;/h1&gt;
 &lt;p&gt;绑定端口分为2种，一种是指定端口号，然后内核去判断这个端口号是否可用，另一种是填端口号为0，内核去从端口号范围内选择一个端口。具体过程是在inet_csk_get_port函数中，本文中内核版本2.6.39.14&lt;/p&gt;
 &lt;p&gt;先说明一个非常重要的函数inet_csk_bind_conflict，在bind hash找到相同的端口，那么会根据reuseaddr，reuseport和tcp状态来决定这个端口是否是可用。
 &lt;pre&gt;&lt;code&gt;
