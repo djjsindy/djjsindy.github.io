@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>epoll函数原理分析</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="">
+    <meta name="author" content="djjsindy">
+
+    <!-- Le styles -->
+    <link rel="stylesheet" href="/theme/css/bootstrap.min.css" type="text/css" />
+    <style type="text/css">
+      body {
+        padding-top: 60px;
+        padding-bottom: 40px;
+      }
+      .sidebar-nav {
+        padding: 9px 0;
+      }
+      .tag-1 {
+        font-size: 13pt;
+      }
+      .tag-2 {
+        font-size: 10pt;
+      }
+      .tag-2 {
+        font-size: 8pt;
+      }
+      .tag-4 {
+        font-size: 6pt;
+     }
+    </style>
+    <link href="/theme/css/bootstrap-responsive.min.css" rel="stylesheet">
+        <link href="/theme/css/font-awesome.css" rel="stylesheet">
+
+    <link href="/theme/css/pygments.css" rel="stylesheet">
+
+    <!-- Le HTML5 shim, for IE6-8 support of HTML5 elements -->
+    <!--[if lt IE 9]>
+      <script src="//html5shim.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+
+    <!-- Le fav and touch icons -->
+    <link rel="shortcut icon" href="/theme/images/favicon.ico">
+    <link rel="apple-touch-icon" href="/theme/images/apple-touch-icon.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="/theme/images/apple-touch-icon-72x72.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="/theme/images/apple-touch-icon-114x114.png">
+
+    <link href="/" type="application/atom+xml" rel="alternate" title="djjsindy ATOM Feed" />
+
+  </head>
+
+  <body>
+
+    <div class="navbar navbar-fixed-top">
+      <div class="navbar-inner">
+        <div class="container-fluid">
+          <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </a>
+          <a class="brand" href="/index.html">djjsindy </a>
+          <div class="nav-collapse">
+            <ul class="nav">
+                          <li class="divider-vertical"></li>
+                  <li >
+                    <a href="/category/nginx.html">
+						<i class="icon-folder-open icon-large"></i>nginx
+					</a>
+                  </li>
+                  <li >
+                    <a href="/category/ptmalloc.html">
+						<i class="icon-folder-open icon-large"></i>ptmalloc
+					</a>
+                  </li>
+                  <li class="active">
+                    <a href="/category/socket.html">
+						<i class="icon-folder-open icon-large"></i>socket
+					</a>
+                  </li>
+                  <li >
+                    <a href="/category/tomcat.html">
+						<i class="icon-folder-open icon-large"></i>tomcat
+					</a>
+                  </li>
+
+                          <ul class="nav pull-right">
+                                <li><a href="/archives.html"><i class="icon-th-list"></i>Archives</a></li>
+                          </ul>
+
+            </ul>
+            <!--<p class="navbar-text pull-right">Logged in as <a href="#">username</a></p>-->
+          </div><!--/.nav-collapse -->
+        </div>
+      </div>
+    </div>
+
+    <div class="container-fluid">
+      <div class="row">
+        <div class="span9" id="content">
+<section id="content">
+        <article>
+                <header>
+                        <h1>
+                                <a href=""
+                                        rel="bookmark"
+                                        title="Permalink to epoll函数原理分析">
+                                        epoll函数原理分析
+                                </a>
+                        </h1>
+                </header>
+                <div class="entry-content">
+                <div class="well">
+<footer class="post-info">
+<span class="label">Date</span>
+<abbr class="published" title="2014-05-20T14:51:00">
+        <i class="icon-calendar"></i>Tue 20 May 2014
+</abbr>
+<span class="label">By</span>
+<a href="/author/djjsindy.html"><i class="icon-user"></i>djjsindy</a>
+<span class="label">Category</span>
+<a href="/category/socket.html"><i class="icon-folder-open"></i>socket</a>.
+
+
+<span class="label">Tags</span>
+	<a href="/tag/socket.html"><i class="icon-tag"></i>socket</a>
+</footer><!-- /.post-info -->                </div>
+                <h1>epoll函数原理分析</h1>
+<p>select函数的在监控fd数量非常巨大的情况下，效率低，主要原因：</p>
+<ol>
+<li>用户态下，每次调用select函数之前，需要把fd关注的事件重新设置，这样select函数到了内核态，需要频繁将用户态的数据复制到内核态。</li>
+<li>设备驱动在唤醒睡眠进程之后，需要重新扫描所有的fd，然后筛选fd产生的事件。</li>
+</ol>
+<p>epoll函数之所以设计的高效是因为：</p>
+<ol>
+<li>epoll函数需要创建自己单独的文件系统，返回给用户态epoll fd，这个fd是拿到内核态struct file的关键，找到了这个file，就能找到struct eventpoll全局结构体。每个用户态关注的事件，会直接注册到内核态struct eventpoll里面，所以epoll fd是用户态和内核态struct eventpoll的桥梁。</li>
+<li>有了上面的struct eventpoll，驱动只要把激发的事件放到eventpoll里面的事件就绪队列就可以了，然后唤醒进程后，检查就绪队列是否有事件，如果有直接把激发的事件copy到用户态的events里面即可。不用向select函数那样轮询每个监控的fd了。</li>
+<li>同时内核中对于每个fd形成一个结构体struct epitem，用红黑树来管理，这样保证了插入和查找的效率。</li>
+</ol>
+<p>struct eventpoll结构
+<pre><code>
+struct eventpoll {
+    /<em> Protect the access to this structure </em>/
+    spinlock_t lock;
+    /<em>
+     * This mutex is used to ensure that files are not removed
+     * while epoll is using them. This is held during the event
+     * collection loop, the file cleanup path, the epoll file exit
+     * code and the ctl operations.
+     </em>/
+    struct mutex mtx;
+    /<em> Wait queue used by sys_epoll_wait() </em>/
+    //阻塞在epoll_wait函数的阻塞队列，当添加通过epoll_ctl添加事件后，poll函数返回了触发的事件，那么会直接通过这个wq唤醒epoll_wait进程，或者中断处理函数唤醒epoll_wait进程
+    wait_queue_head_t wq; <br />
+    /<em> Wait queue used by file-&gt;poll() </em>/
+    //调用epoll fd poll函数的进程的阻塞队列，关心的是是否有注册事件，当有注册事件的时候会唤醒相关进程
+    wait_queue_head_t poll_wait;
+    /<em> List of ready file descriptors </em>/
+    //就绪事件队列，中断会入队事件
+    struct list_head rdllist; 
+    /<em> RB tree root used to store monitored fd structs </em>/
+    //管理fd的红黑树
+    struct rb_root rbr;
+    /<em>
+     * This is a single linked list that chains all the "struct epitem" that
+     * happened while transferring ready events to userspace w/out
+     * holding -&gt;lock.
+     </em>/
+    struct epitem <em>ovflist;
+    /</em> The user that created the eventpoll descriptor <em>/
+    struct user_struct </em>user;
+};
+</code></pre></p>
+<p>epoll_create函数创建struct file，struct eventpoll，把eventpoll放到file的private_data中，以后使用eventpoll的时候，直接通过fd找到file，再通过private_data找到。</p>
+<p>epoll_ctl注册事件，主要流程设置阻塞队列，调用fd的poll函数，监测是否有事件发生，如果已经有事件发生，那么把事件放到rdllist中，同时唤醒eventpoll-&gt;wq中的进程。</p>
+<p>核心代码：
+<pre><code>
+    epi = ep_find(ep, tfile, fd);//通过红黑树来查找fd对应的epitem
+    error = -EINVAL;
+    switch (op) {
+    case EPOLL_CTL_ADD:
+        if (!epi) {
+            epds.events |= POLLERR | POLLHUP;
+            error = ep_insert(ep, &amp;epds, tfile, fd); //添加关注事件
+        } else
+            error = -EEXIST;
+        break;
+    case EPOLL_CTL_DEL:
+        if (epi)
+            error = ep_remove(ep, epi);
+        else
+            error = -ENOENT;
+        break;
+    case EPOLL_CTL_MOD:
+        if (epi) {
+            epds.events |= POLLERR | POLLHUP;
+            error = ep_modify(ep, epi, &amp;epds);
+        } else
+            error = -ENOENT;
+        break;
+    }
+    mutex_unlock(&amp;ep-&gt;mtx);</p>
+<p></code></pre></p>
+<p>关注添加关注事件函数</p>
+<pre><code>
+      //设置poll wait函数，设置wakeup回调函数
+     init_poll_funcptr(&epq.pt, ep_ptable_queue_proc);
+
+    /*
+     * Attach the item to the poll hooks and get current event bits.
+     * We can safely use the file* here because its usage count has
+     * been increased by the caller of this function. Note that after
+     * this operation completes, the poll callback can start hitting
+     * the new item.
+     */
+    //调用tcp_poll函数，首先回调poll_wait函数，设置阻塞队列在socket的wait queue上
+    revents = tfile->f_op->poll(tfile, &epq.pt);
+</code></pre>
+
+<p>poll wait回调函数是ep_ptable_queue_proc</p>
+<pre><code>
+//whead是struct sock中的wait queue
+static void ep_ptable_queue_proc(struct file *file, wait_queue_head_t *whead,
+                 poll_table *pt)
+{
+    struct epitem *epi = ep_item_from_epqueue(pt);
+    struct eppoll_entry *pwq;
+     //分配wait entry
+    if (epi->nwait >= 0 && (pwq = kmem_cache_alloc(pwq_cache, GFP_KERNEL))) {
+        //设置wakeup函数
+        init_waitqueue_func_entry(&pwq->wait, ep_poll_callback);
+        pwq->whead = whead;
+        pwq->base = epi;
+        //加入等待队列
+        add_wait_queue(whead, &pwq->wait);
+        list_add_tail(&pwq->llink, &epi->pwqlist);
+        epi->nwait++;
+    } else {
+        /* We have to signal that an error occurred */
+        epi->nwait = -1;
+    }
+}
+</code></pre>
+
+<p>ep_epoll_callback函数是中断回调函数，和select函数调用机制相同</p>
+<pre><code>
+static int ep_poll_callback(wait_queue_t *wait, unsigned mode, int sync, void *key)
+{
+    int pwake = 0;
+    unsigned long flags;
+    struct epitem *epi = ep_item_from_wait(wait);
+    struct eventpoll *ep = epi->ep;
+
+    spin_lock_irqsave(&ep->lock, flags);
+
+    /*
+     * If the event mask does not contain any poll(2) event, we consider the
+     * descriptor to be disabled. This condition is likely the effect of the
+     * EPOLLONESHOT bit that disables the descriptor when an event is received,
+     * until the next EPOLL_CTL_MOD will be issued.
+     */
+     //如果设置了EPOLLONESHOT，那么只能触发一次事件
+    if (!(epi->event.events & ~EP_PRIVATE_BITS))
+        goto out_unlock;
+
+    /*
+     * Check the events coming with the callback. At this stage, not
+     * every device reports the events in the "key" parameter of the
+     * callback. We need to be able to handle both cases here, hence the
+     * test for "key" != NULL before the event match test.
+     */
+    //如果触发了事件，如果和注册的事件有交集，就继续加入rdllist，否则退出
+    if (key && !((unsigned long) key & epi->event.events))
+        goto out_unlock;
+
+    /*
+     * If we are transferring events to userspace, we can hold no locks
+     * (because we're accessing user memory, and because of linux f_op->poll()
+     * semantics). All the events that happen during that period of time are
+     * chained in ep->ovflist and requeued later on.
+     */
+    //在最后copy事件到用户空间的时候会占用rdllist，这时把事件先放到ovflist中
+    if (unlikely(ep->ovflist != EP_UNACTIVE_PTR)) {
+        if (epi->next == EP_UNACTIVE_PTR) {
+            epi->next = ep->ovflist;
+            ep->ovflist = epi;
+        }
+        goto out_unlock;
+    }
+    //把事件加入rdllist中，一个fd一次
+    /* If this file is already in the ready list we exit soon */
+    if (!ep_is_linked(&epi->rdllink))
+        list_add_tail(&epi->rdllink, &ep->rdllist);
+
+    /*
+     * Wake up ( if active ) both the eventpoll wait list and the ->poll()
+     * wait list.
+     */
+    //唤醒epoll_wait中的进程
+    if (waitqueue_active(&ep->wq))
+        wake_up_locked(&ep->wq);
+
+    if (waitqueue_active(&ep->poll_wait))
+        pwake++;
+
+out_unlock:
+    spin_unlock_irqrestore(&ep->lock, flags);
+
+    /* We have to call this outside the lock */
+    if (pwake)
+        ep_poll_safewake(&ep->poll_wait);
+
+    return 1;
+}
+</code></pre>
+
+<p>以上需要注意的是，当epoll_wait进程正在处理rdllist的时候（把事件copy到用户态的变量），激发的事件会暂时放在ovflist，在说下epoll_wait的流程</p>
+<pre><code>
+fetch_events:
+    spin_lock_irqsave(&ep->lock, flags);
+
+    if (!ep_events_available(ep)) {
+        /*
+         * We don't have any available event to return to the caller.
+         * We need to sleep here, and we will be wake up by
+         * ep_poll_callback() when events will become available.
+         */
+        init_waitqueue_entry(&wait, current);  //初始化wait queue
+        __add_wait_queue_exclusive(&ep->wq, &wait); //加入wait queue,中断后满足条件，会唤醒这个进程
+
+        for (;;) {
+            /*
+             * We don't want to sleep if the ep_poll_callback() sends us
+             * a wakeup in between. That's why we set the task state
+             * to TASK_INTERRUPTIBLE before doing the checks.
+             */
+            set_current_state(TASK_INTERRUPTIBLE);
+            if (ep_events_available(ep) || timed_out) //检查eventpoll的rdllist是否有激发的事件或者有事件暂时放在ovflist
+                break;
+            if (signal_pending(current)) { //如果有信号，那么也退出
+                res = -EINTR;
+                break;
+            }
+
+            spin_unlock_irqrestore(&ep->lock, flags);
+            if (!schedule_hrtimeout_range(to, slack, HRTIMER_MODE_ABS)) //进程休眠
+                timed_out = 1;
+
+            spin_lock_irqsave(&ep->lock, flags);
+        }
+        __remove_wait_queue(&ep->wq, &wait); //已经有事件了，去掉阻塞队列
+
+        set_current_state(TASK_RUNNING);
+    }
+check_events:
+    /* Is it worth to try to dig for events ? */
+    eavail = ep_events_available(ep); //是否有事件
+
+    spin_unlock_irqrestore(&ep->lock, flags);
+
+    /*
+     * Try to transfer events to user space. In case we get 0 events and
+     * there's still timeout left over, we go trying again in search of
+     * more luck.
+     */
+     //把事件复制到用户态的events
+    if (!res && eavail &&
+        !(res = ep_send_events(ep, events, maxevents)) && !timed_out)
+        goto fetch_events;
+
+    return res;
+</code></pre>
+
+<p>最终的收尾工作是ep_send_events，把rdllist中的事件copy到events里面，最终是函数ep_send_events_proc
+完成这个工作</p>
+<pre><code>
+for (eventcnt = 0, uevent = esed->events;
+         !list_empty(head) && eventcnt < esed->maxevents;) {
+        epi = list_first_entry(head, struct epitem, rdllink);
+
+        list_del_init(&epi->rdllink);
+        //检查事件，wait是NULL，不会设置阻塞队列
+        revents = epi->ffd.file->f_op->poll(epi->ffd.file, NULL) &
+            epi->event.events;
+
+        /*
+         * If the event mask intersect the caller-requested one,
+         * deliver the event to userspace. Again, ep_scan_ready_list()
+         * is holding "mtx", so no operations coming from userspace
+         * can change the item.
+         */
+        if (revents) {
+        //把事件放入用户态变量events
+            if (__put_user(revents, &uevent->events) ||
+                __put_user(epi->event.data, &uevent->data)) {
+                list_add(&epi->rdllink, head);
+                return eventcnt ? eventcnt : -EFAULT;
+            }
+            eventcnt++;
+            uevent++;
+            if (epi->event.events & EPOLLONESHOT)
+                epi->event.events &= EP_PRIVATE_BITS;
+            else if (!(epi->event.events & EPOLLET)) {
+              //水平模式
+                /*
+                 * If this file has been added with Level
+                 * Trigger mode, we need to insert back inside
+                 * the ready list, so that the next call to
+                 * epoll_wait() will check again the events
+                 * availability. At this point, no one can insert
+                 * into ep->rdllist besides us. The epoll_ctl()
+                 * callers are locked out by
+                 * ep_scan_ready_list() holding "mtx" and the
+                 * poll callback will queue them in ep->ovflist.
+                 */
+                list_add_tail(&epi->rdllink, &ep->rdllist);
+            }
+        }
+    }
+</code></pre>
+
+<p>最后说下epoll的水平触发和边沿触发模式</p>
+<ol>
+<li>
+<p>水平触发：每次触发事件后，无论用户态进程如何用read write处理数据，都会轮询调用fd的poll函数。</p>
+</li>
+<li>
+<p>边沿触发：在中断处理函数处理后，发现事件，才会触发事件，其他时间不会主动轮询poll函数。</p>
+</li>
+</ol>
+<p>可以说select函数都是水平触发，调用select函数都是会轮询每个监控fd的poll函数，看是否有事件发生。所以对于用户态进程read write函数，如何处理数据，都无关，即便read取不干净buf中的数据，下次select函数轮询fd的poll函数的时候还会触发事件。</p>
+<p>epoll函数的水平触发，epoll函数的本意不是轮询fd的poll函数，假如中断函数唤醒了epoll_wait进程，把事件copy到了用户态，但是用户态进程，以read为例子，没有拿干净buf中的数据，那么如果之后没有数据到达，那么也就触发不了中断，也就触发不了事件，那么buf中剩余的数据是取不出来的。所以epoll函数默认情况下还是会把当前事件再次放到rdllist中，以便轮询事件。</p>
+<p>epoll函数的边缘触发和水平触发的不同之处在于，epoll函数处理完当前事件后，不会把事件再次加入到rdllist中，也就是不会轮询fd的poll函数，那么这种情况下要求，用户态进程调用read函数把buf中的数据全部copy到用户态，write函数要求把buf写满。也就是说read函数需要不停的read，直到read出来的count小于buf的大小。不停的write出去的数据直到write出去的count小于buf的大小。</p>
+<p>从上面的代码可以看出，确实水平模式事件最后还是会再次加入rdllist中，所以如果epoll使用水平模式第一次触发事件的效率比select函数要高很多，因为中断把事件加入到了rdllist中，并没有轮询其他没有事件的fd的poll函数。后面会把epi加入到rdllist中做轮询，如果在socket未有新事件到达的情况下，一次read write未能处理干净数据的话，epoll会多次轮询，这会导致效率低下。处理干净数据后就不会再次加入到rdllist中了。所以水平模式下的epoll在用户态进程一次处理不完数据的情况下，会导致短暂的轮询，处理完成后解除轮询，效率会有比较大的影响。</p>
+<p>再者边缘模式的epoll，不存在轮询的现象，效率自然很高。但是要求read和write函数对buf处理需要彻底。这对于用户态来说，如何防止其他的连接上的数据不被饿死，代码就会更加复杂一些。</p>
+                </div><!-- /.entry-content -->
+        </article>
+</section>
+        </div><!--/span-->
+
+                <div class="span3 well sidebar-nav" id="sidebar">
+<ul class="nav nav-list">
+
+<li class="nav-header"><h4><i class="icon-folder-close icon-large"></i>Categories</h4></li>
+<li>
+<a href="/category/nginx.html">
+    <i class="icon-folder-open icon-large"></i>nginx
+</a>
+</li>
+<li>
+<a href="/category/ptmalloc.html">
+    <i class="icon-folder-open icon-large"></i>ptmalloc
+</a>
+</li>
+<li>
+<a href="/category/socket.html">
+    <i class="icon-folder-open icon-large"></i>socket
+</a>
+</li>
+<li>
+<a href="/category/tomcat.html">
+    <i class="icon-folder-open icon-large"></i>tomcat
+</a>
+</li>
+
+<li class="nav-header"><h4><i class="icon-tags icon-large"></i>Tags</h4></li>
+<li class="tag-1">
+    <a href="/tag/nginx.html">
+        <i class="icon-tag icon-large"></i>nginx
+    </a>
+</li>
+<li class="tag-1">
+    <a href="/tag/socket.html">
+        <i class="icon-tag icon-large"></i>socket
+    </a>
+</li>
+<li class="tag-1">
+    <a href="/tag/ptmalloc.html">
+        <i class="icon-tag icon-large"></i>ptmalloc
+    </a>
+</li>
+<li class="tag-2">
+    <a href="/tag/tomcat.html">
+        <i class="icon-tag icon-large"></i>tomcat
+    </a>
+</li>
+
+
+</ul>        </div><!--/.well -->
+
+      </div><!--/row-->
+
+      <hr>
+
+      <footer>
+        <address id="about">
+                Proudly powered by <a href="http://pelican.notmyidea.org/">Pelican <i class="icon-external-link"></i></a>,
+                                which takes great advantage of <a href="http://python.org">Python <i class="icon-external-link"></i></a>.
+        </address><!-- /#about -->
+
+        <p>The theme is from <a href="http://twitter.github.com/bootstrap/">Bootstrap from Twitter <i class="icon-external-link"></i></a>,
+                   and <a href="http://fortawesome.github.com/Font-Awesome/">Font-Awesome <i class="icon-external-link"></i></a>, thanks!</p>
+      </footer>
+
+    </div><!--/.fluid-container-->
+
+
+<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+try {
+	var pageTracker = _gat._getTracker("UA-43260693-1");
+pageTracker._trackPageview();
+} catch(err) {}</script>
+
+    <!-- Le javascript -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="/theme/js/jquery-1.7.2.min.js"></script>
+    <script src="/theme/js/bootstrap.min.js"></script>
+  </body>
+</html>

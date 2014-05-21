@@ -100,6 +100,27 @@
       <div class="row">
         <div class="span9" id="content">
         <div class="article">
+                <h1><a href="/tomcat-async.html">tomcat的异步servlet处理</a></h1>
+                <div class="well small"><footer class="post-info">
+<span class="label">Date</span>
+<abbr class="published" title="2013-07-17T12:02:00">
+        <i class="icon-calendar"></i>Wed 17 July 2013
+</abbr>
+<span class="label">By</span>
+<a href="/author/djjsindy.html"><i class="icon-user"></i>djjsindy</a>
+<span class="label">Category</span>
+<a href="/category/tomcat.html"><i class="icon-folder-open"></i>tomcat</a>.
+
+
+<span class="label">Tags</span>
+	<a href="/tag/tomcat.html"><i class="icon-tag"></i>tomcat</a>
+</footer><!-- /.post-info --></div>
+                <div class="summary"><p>这个是以前看的，由于最近工作中用到异步servlet，看了一下tomcat在对servlet3.0中AsyncContext的实现过程，总结一下，使用异步servlet主要原因就是因为，在service方法中业务逻辑如果碰到io操作时间比较长的操作，这样这个service方法就会长时间占用tomcat容器线程池中的线程，这样是不利于其他请求的处理的，当线程池中的线程处理任务时，任务由于长时间io操作，肯定会阻塞线程处理其他任务，引入异步servlet的目的就是将容器线程池和业务线程池分离开。在处理大io的业务操作的时候，把这个操作移动到业务线程池中进行，释放容器线程，使得容器线程处理其他任务，在业务逻辑执行完毕之后，然后在通知tomcat容器线程池来继续后面的操作，这个操作应该是把处理结果commit到客户端或者是dispatch到其他servlet上。</p>
+                        <a class="btn primary xsmall" href="/tomcat-async.html">more ...</a>
+                </div>
+        </div>
+        <hr />
+        <div class="article">
                 <h1><a href="/nginx-header-buf.html">nginx request buf</a></h1>
                 <div class="well small"><footer class="post-info">
 <span class="label">Date</span>
@@ -221,14 +242,9 @@
 </li>
 
 <li class="nav-header"><h4><i class="icon-tags icon-large"></i>Tags</h4></li>
-<li class="tag-2">
-    <a href="/tag/tomcat.html">
-        <i class="icon-tag icon-large"></i>tomcat
-    </a>
-</li>
 <li class="tag-1">
-    <a href="/tag/ptmalloc.html">
-        <i class="icon-tag icon-large"></i>ptmalloc
+    <a href="/tag/nginx.html">
+        <i class="icon-tag icon-large"></i>nginx
     </a>
 </li>
 <li class="tag-1">
@@ -237,8 +253,13 @@
     </a>
 </li>
 <li class="tag-1">
-    <a href="/tag/nginx.html">
-        <i class="icon-tag icon-large"></i>nginx
+    <a href="/tag/ptmalloc.html">
+        <i class="icon-tag icon-large"></i>ptmalloc
+    </a>
+</li>
+<li class="tag-2">
+    <a href="/tag/tomcat.html">
+        <i class="icon-tag icon-large"></i>tomcat
     </a>
 </li>
 

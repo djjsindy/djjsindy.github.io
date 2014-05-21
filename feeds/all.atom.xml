@@ -1,5 +1,312 @@
 <?xml version="1.0" encoding="utf-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom"><title>djjsindy</title><link href="/" rel="alternate"></link><link href="/feeds/all.atom.xml" rel="self"></link><id>/</id><updated>2014-05-19T16:09:00+02:00</updated><entry><title>select函数原理</title><link href="/selecthan-shu-yuan-li.html" rel="alternate"></link><updated>2014-05-19T16:09:00+02:00</updated><author><name>djjsindy</name></author><id>tag:,2014-05-19:selecthan-shu-yuan-li.html</id><summary type="html">&lt;h1&gt;select函数原理&lt;/h1&gt;
+<feed xmlns="http://www.w3.org/2005/Atom"><title>djjsindy</title><link href="/" rel="alternate"></link><link href="/feeds/all.atom.xml" rel="self"></link><id>/</id><updated>2014-05-20T14:51:00+02:00</updated><entry><title>epoll函数原理分析</title><link href="/epollhan-shu-yuan-li-fen-xi.html" rel="alternate"></link><updated>2014-05-20T14:51:00+02:00</updated><author><name>djjsindy</name></author><id>tag:,2014-05-20:epollhan-shu-yuan-li-fen-xi.html</id><summary type="html">&lt;h1&gt;epoll函数原理分析&lt;/h1&gt;
+&lt;p&gt;select函数的在监控fd数量非常巨大的情况下，效率低，主要原因：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;用户态下，每次调用select函数之前，需要把fd关注的事件重新设置，这样select函数到了内核态，需要频繁将用户态的数据复制到内核态。&lt;/li&gt;
+&lt;li&gt;设备驱动在唤醒睡眠进程之后，需要重新扫描所有的fd，然后筛选fd产生的事件。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;epoll函数之所以设计的高效是因为：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;epoll函数需要创建自己单独的文件系统，返回给用户态epoll fd，这个fd是拿到内核态struct file的关键，找到了这个file，就能找到struct eventpoll全局结构体。每个用户态关注的事件，会直接注册到内核态struct eventpoll里面，所以epoll fd是用户态和内核态struct eventpoll的桥梁。&lt;/li&gt;
+&lt;li&gt;有了上面的struct eventpoll，驱动只要把激发的事件放到eventpoll里面的事件就绪队列就可以了，然后唤醒进程后，检查就绪队列是否有事件，如果有直接把激发的事件copy到用户态的events里面即可。不用向select函数那样轮询每个监控的fd了。&lt;/li&gt;
+&lt;li&gt;同时内核中对于每个fd形成一个结构体struct epitem，用红黑树来管理，这样保证了插入和查找的效率。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;struct eventpoll结构
+&lt;pre&gt;&lt;code&gt;
+struct eventpoll {
+    /&lt;em&gt; Protect the access to this structure &lt;/em&gt;/
+    spinlock_t lock;
+    /&lt;em&gt;
+     * This mutex is used to ensure that files are not removed
+     * while epoll is using them. This is held during the event
+     * collection loop, the file cleanup path, the epoll file exit
+     * code and the ctl operations.
+     &lt;/em&gt;/
+    struct mutex mtx;
+    /&lt;em&gt; Wait queue used by sys_epoll_wait() &lt;/em&gt;/
+    //阻塞在epoll_wait函数的阻塞队列，当添加通过epoll_ctl添加事件后，poll函数返回了触发的事件，那么会直接通过这个wq唤醒epoll_wait进程，或者中断处理函数唤醒epoll_wait进程
+    wait_queue_head_t wq; &lt;br /&gt;
+    /&lt;em&gt; Wait queue used by file-&amp;gt;poll() &lt;/em&gt;/
+    //调用epoll fd poll函数的进程的阻塞队列，关心的是是否有注册事件，当有注册事件的时候会唤醒相关进程
+    wait_queue_head_t poll_wait;
+    /&lt;em&gt; List of ready file descriptors &lt;/em&gt;/
+    //就绪事件队列，中断会入队事件
+    struct list_head rdllist; 
+    /&lt;em&gt; RB tree root used to store monitored fd structs &lt;/em&gt;/
+    //管理fd的红黑树
+    struct rb_root rbr;
+    /&lt;em&gt;
+     * This is a single linked list that chains all the "struct epitem" that
+     * happened while transferring ready events to userspace w/out
+     * holding -&amp;gt;lock.
+     &lt;/em&gt;/
+    struct epitem &lt;em&gt;ovflist;
+    /&lt;/em&gt; The user that created the eventpoll descriptor &lt;em&gt;/
+    struct user_struct &lt;/em&gt;user;
+};
+&lt;/code&gt;&lt;/pre&gt;&lt;/p&gt;
+&lt;p&gt;epoll_create函数创建struct file，struct eventpoll，把eventpoll放到file的private_data中，以后使用eventpoll的时候，直接通过fd找到file，再通过private_data找到。&lt;/p&gt;
+&lt;p&gt;epoll_ctl注册事件，主要流程设置阻塞队列，调用fd的poll函数，监测是否有事件发生，如果已经有事件发生，那么把事件放到rdllist中，同时唤醒eventpoll-&amp;gt;wq中的进程。&lt;/p&gt;
+&lt;p&gt;核心代码：
+&lt;pre&gt;&lt;code&gt;
+    epi = ep_find(ep, tfile, fd);//通过红黑树来查找fd对应的epitem
+    error = -EINVAL;
+    switch (op) {
+    case EPOLL_CTL_ADD:
+        if (!epi) {
+            epds.events |= POLLERR | POLLHUP;
+            error = ep_insert(ep, &amp;amp;epds, tfile, fd); //添加关注事件
+        } else
+            error = -EEXIST;
+        break;
+    case EPOLL_CTL_DEL:
+        if (epi)
+            error = ep_remove(ep, epi);
+        else
+            error = -ENOENT;
+        break;
+    case EPOLL_CTL_MOD:
+        if (epi) {
+            epds.events |= POLLERR | POLLHUP;
+            error = ep_modify(ep, epi, &amp;amp;epds);
+        } else
+            error = -ENOENT;
+        break;
+    }
+    mutex_unlock(&amp;amp;ep-&amp;gt;mtx);&lt;/p&gt;
+&lt;p&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/p&gt;
+&lt;p&gt;关注添加关注事件函数&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;
+      //设置poll wait函数，设置wakeup回调函数
+     init_poll_funcptr(&amp;epq.pt, ep_ptable_queue_proc);
+
+    /*
+     * Attach the item to the poll hooks and get current event bits.
+     * We can safely use the file* here because its usage count has
+     * been increased by the caller of this function. Note that after
+     * this operation completes, the poll callback can start hitting
+     * the new item.
+     */
+    //调用tcp_poll函数，首先回调poll_wait函数，设置阻塞队列在socket的wait queue上
+    revents = tfile-&gt;f_op-&gt;poll(tfile, &amp;epq.pt);
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;poll wait回调函数是ep_ptable_queue_proc&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;
+//whead是struct sock中的wait queue
+static void ep_ptable_queue_proc(struct file *file, wait_queue_head_t *whead,
+                 poll_table *pt)
+{
+    struct epitem *epi = ep_item_from_epqueue(pt);
+    struct eppoll_entry *pwq;
+     //分配wait entry
+    if (epi-&gt;nwait &gt;= 0 &amp;&amp; (pwq = kmem_cache_alloc(pwq_cache, GFP_KERNEL))) {
+        //设置wakeup函数
+        init_waitqueue_func_entry(&amp;pwq-&gt;wait, ep_poll_callback);
+        pwq-&gt;whead = whead;
+        pwq-&gt;base = epi;
+        //加入等待队列
+        add_wait_queue(whead, &amp;pwq-&gt;wait);
+        list_add_tail(&amp;pwq-&gt;llink, &amp;epi-&gt;pwqlist);
+        epi-&gt;nwait++;
+    } else {
+        /* We have to signal that an error occurred */
+        epi-&gt;nwait = -1;
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;ep_epoll_callback函数是中断回调函数，和select函数调用机制相同&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;
+static int ep_poll_callback(wait_queue_t *wait, unsigned mode, int sync, void *key)
+{
+    int pwake = 0;
+    unsigned long flags;
+    struct epitem *epi = ep_item_from_wait(wait);
+    struct eventpoll *ep = epi-&gt;ep;
+
+    spin_lock_irqsave(&amp;ep-&gt;lock, flags);
+
+    /*
+     * If the event mask does not contain any poll(2) event, we consider the
+     * descriptor to be disabled. This condition is likely the effect of the
+     * EPOLLONESHOT bit that disables the descriptor when an event is received,
+     * until the next EPOLL_CTL_MOD will be issued.
+     */
+     //如果设置了EPOLLONESHOT，那么只能触发一次事件
+    if (!(epi-&gt;event.events &amp; ~EP_PRIVATE_BITS))
+        goto out_unlock;
+
+    /*
+     * Check the events coming with the callback. At this stage, not
+     * every device reports the events in the "key" parameter of the
+     * callback. We need to be able to handle both cases here, hence the
+     * test for "key" != NULL before the event match test.
+     */
+    //如果触发了事件，如果和注册的事件有交集，就继续加入rdllist，否则退出
+    if (key &amp;&amp; !((unsigned long) key &amp; epi-&gt;event.events))
+        goto out_unlock;
+
+    /*
+     * If we are transferring events to userspace, we can hold no locks
+     * (because we're accessing user memory, and because of linux f_op-&gt;poll()
+     * semantics). All the events that happen during that period of time are
+     * chained in ep-&gt;ovflist and requeued later on.
+     */
+    //在最后copy事件到用户空间的时候会占用rdllist，这时把事件先放到ovflist中
+    if (unlikely(ep-&gt;ovflist != EP_UNACTIVE_PTR)) {
+        if (epi-&gt;next == EP_UNACTIVE_PTR) {
+            epi-&gt;next = ep-&gt;ovflist;
+            ep-&gt;ovflist = epi;
+        }
+        goto out_unlock;
+    }
+    //把事件加入rdllist中，一个fd一次
+    /* If this file is already in the ready list we exit soon */
+    if (!ep_is_linked(&amp;epi-&gt;rdllink))
+        list_add_tail(&amp;epi-&gt;rdllink, &amp;ep-&gt;rdllist);
+
+    /*
+     * Wake up ( if active ) both the eventpoll wait list and the -&gt;poll()
+     * wait list.
+     */
+    //唤醒epoll_wait中的进程
+    if (waitqueue_active(&amp;ep-&gt;wq))
+        wake_up_locked(&amp;ep-&gt;wq);
+
+    if (waitqueue_active(&amp;ep-&gt;poll_wait))
+        pwake++;
+
+out_unlock:
+    spin_unlock_irqrestore(&amp;ep-&gt;lock, flags);
+
+    /* We have to call this outside the lock */
+    if (pwake)
+        ep_poll_safewake(&amp;ep-&gt;poll_wait);
+
+    return 1;
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;以上需要注意的是，当epoll_wait进程正在处理rdllist的时候（把事件copy到用户态的变量），激发的事件会暂时放在ovflist，在说下epoll_wait的流程&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;
+fetch_events:
+    spin_lock_irqsave(&amp;ep-&gt;lock, flags);
+
+    if (!ep_events_available(ep)) {
+        /*
+         * We don't have any available event to return to the caller.
+         * We need to sleep here, and we will be wake up by
+         * ep_poll_callback() when events will become available.
+         */
+        init_waitqueue_entry(&amp;wait, current);  //初始化wait queue
+        __add_wait_queue_exclusive(&amp;ep-&gt;wq, &amp;wait); //加入wait queue,中断后满足条件，会唤醒这个进程
+
+        for (;;) {
+            /*
+             * We don't want to sleep if the ep_poll_callback() sends us
+             * a wakeup in between. That's why we set the task state
+             * to TASK_INTERRUPTIBLE before doing the checks.
+             */
+            set_current_state(TASK_INTERRUPTIBLE);
+            if (ep_events_available(ep) || timed_out) //检查eventpoll的rdllist是否有激发的事件或者有事件暂时放在ovflist
+                break;
+            if (signal_pending(current)) { //如果有信号，那么也退出
+                res = -EINTR;
+                break;
+            }
+
+            spin_unlock_irqrestore(&amp;ep-&gt;lock, flags);
+            if (!schedule_hrtimeout_range(to, slack, HRTIMER_MODE_ABS)) //进程休眠
+                timed_out = 1;
+
+            spin_lock_irqsave(&amp;ep-&gt;lock, flags);
+        }
+        __remove_wait_queue(&amp;ep-&gt;wq, &amp;wait); //已经有事件了，去掉阻塞队列
+
+        set_current_state(TASK_RUNNING);
+    }
+check_events:
+    /* Is it worth to try to dig for events ? */
+    eavail = ep_events_available(ep); //是否有事件
+
+    spin_unlock_irqrestore(&amp;ep-&gt;lock, flags);
+
+    /*
+     * Try to transfer events to user space. In case we get 0 events and
+     * there's still timeout left over, we go trying again in search of
+     * more luck.
+     */
+     //把事件复制到用户态的events
+    if (!res &amp;&amp; eavail &amp;&amp;
+        !(res = ep_send_events(ep, events, maxevents)) &amp;&amp; !timed_out)
+        goto fetch_events;
+
+    return res;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;最终的收尾工作是ep_send_events，把rdllist中的事件copy到events里面，最终是函数ep_send_events_proc
+完成这个工作&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;
+for (eventcnt = 0, uevent = esed-&gt;events;
+         !list_empty(head) &amp;&amp; eventcnt &lt; esed-&gt;maxevents;) {
+        epi = list_first_entry(head, struct epitem, rdllink);
+
+        list_del_init(&amp;epi-&gt;rdllink);
+        //检查事件，wait是NULL，不会设置阻塞队列
+        revents = epi-&gt;ffd.file-&gt;f_op-&gt;poll(epi-&gt;ffd.file, NULL) &amp;
+            epi-&gt;event.events;
+
+        /*
+         * If the event mask intersect the caller-requested one,
+         * deliver the event to userspace. Again, ep_scan_ready_list()
+         * is holding "mtx", so no operations coming from userspace
+         * can change the item.
+         */
+        if (revents) {
+        //把事件放入用户态变量events
+            if (__put_user(revents, &amp;uevent-&gt;events) ||
+                __put_user(epi-&gt;event.data, &amp;uevent-&gt;data)) {
+                list_add(&amp;epi-&gt;rdllink, head);
+                return eventcnt ? eventcnt : -EFAULT;
+            }
+            eventcnt++;
+            uevent++;
+            if (epi-&gt;event.events &amp; EPOLLONESHOT)
+                epi-&gt;event.events &amp;= EP_PRIVATE_BITS;
+            else if (!(epi-&gt;event.events &amp; EPOLLET)) {
+              //水平模式
+                /*
+                 * If this file has been added with Level
+                 * Trigger mode, we need to insert back inside
+                 * the ready list, so that the next call to
+                 * epoll_wait() will check again the events
+                 * availability. At this point, no one can insert
+                 * into ep-&gt;rdllist besides us. The epoll_ctl()
+                 * callers are locked out by
+                 * ep_scan_ready_list() holding "mtx" and the
+                 * poll callback will queue them in ep-&gt;ovflist.
+                 */
+                list_add_tail(&amp;epi-&gt;rdllink, &amp;ep-&gt;rdllist);
+            }
+        }
+    }
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;最后说下epoll的水平触发和边沿触发模式&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;水平触发：每次触发事件后，无论用户态进程如何用read write处理数据，都会轮询调用fd的poll函数。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;边沿触发：在中断处理函数处理后，发现事件，才会触发事件，其他时间不会主动轮询poll函数。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;可以说select函数都是水平触发，调用select函数都是会轮询每个监控fd的poll函数，看是否有事件发生。所以对于用户态进程read write函数，如何处理数据，都无关，即便read取不干净buf中的数据，下次select函数轮询fd的poll函数的时候还会触发事件。&lt;/p&gt;
+&lt;p&gt;epoll函数的水平触发，epoll函数的本意不是轮询fd的poll函数，假如中断函数唤醒了epoll_wait进程，把事件copy到了用户态，但是用户态进程，以read为例子，没有拿干净buf中的数据，那么如果之后没有数据到达，那么也就触发不了中断，也就触发不了事件，那么buf中剩余的数据是取不出来的。所以epoll函数默认情况下还是会把当前事件再次放到rdllist中，以便轮询事件。&lt;/p&gt;
+&lt;p&gt;epoll函数的边缘触发和水平触发的不同之处在于，epoll函数处理完当前事件后，不会把事件再次加入到rdllist中，也就是不会轮询fd的poll函数，那么这种情况下要求，用户态进程调用read函数把buf中的数据全部copy到用户态，write函数要求把buf写满。也就是说read函数需要不停的read，直到read出来的count小于buf的大小。不停的write出去的数据直到write出去的count小于buf的大小。&lt;/p&gt;
+&lt;p&gt;从上面的代码可以看出，确实水平模式事件最后还是会再次加入rdllist中，所以如果epoll使用水平模式第一次触发事件的效率比select函数要高很多，因为中断把事件加入到了rdllist中，并没有轮询其他没有事件的fd的poll函数。后面会把epi加入到rdllist中做轮询，如果在socket未有新事件到达的情况下，一次read write未能处理干净数据的话，epoll会多次轮询，这会导致效率低下。处理干净数据后就不会再次加入到rdllist中了。所以水平模式下的epoll在用户态进程一次处理不完数据的情况下，会导致短暂的轮询，处理完成后解除轮询，效率会有比较大的影响。&lt;/p&gt;
+&lt;p&gt;再者边缘模式的epoll，不存在轮询的现象，效率自然很高。但是要求read和write函数对buf处理需要彻底。这对于用户态来说，如何防止其他的连接上的数据不被饿死，代码就会更加复杂一些。&lt;/p&gt;</summary><category term="socket"></category></entry><entry><title>select函数原理分析</title><link href="/selecthan-shu-yuan-li-fen-xi.html" rel="alternate"></link><updated>2014-05-19T16:09:00+02:00</updated><author><name>djjsindy</name></author><id>tag:,2014-05-19:selecthan-shu-yuan-li-fen-xi.html</id><summary type="html">&lt;h1&gt;select函数原理分析&lt;/h1&gt;
 &lt;p&gt;select函数大体原理：函数首先会递归每个文件描述符检查事件，如果没有相关的事件，那么就把当前进程添加到wait_queue中，然后改变当前进程的状态，使得进程不会得到时间片，从而使进程休眠；当设备中断，调用相关的驱动的方法，这时会检查wait_queue,然后唤醒相关的进程，这样会导致select进程继续执行，从新检查文件描述符的状态，这时至少有一个事件被激发，这样select函数就会返回了。select函数会顺序检查每个文件描述符的状态，当文件描述符数量十分巨大的情况下，会导致select函数的效率下降。&lt;/p&gt;
 &lt;p&gt;select的核心函数是do_select函数，代码我就不copy了，说下里面必要重要的wait_queue的相关操作，初始化函数是&lt;code&gt;poll_initwait&lt;/code&gt;&lt;/p&gt;
 &lt;p&gt;fs/select.c&lt;/p&gt;
