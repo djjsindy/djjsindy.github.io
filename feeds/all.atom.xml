@@ -105,39 +105,35 @@ if (ip_hdr(skb)-&gt;frag_off &amp; htons(IP_MF | IP_OFFSET)) {
     flags = offset &amp;amp; ~IP_OFFSET; //获得3位标志位
     offset &amp;amp;= IP_OFFSET; //13位片内偏移
     offset &amp;lt;&amp;lt;= 3;       /&lt;em&gt; offset is in 8-byte chunks &lt;/em&gt;///13位片内偏移，这个表示按照8位为一个偏移，所以要乘以8
-    ihl = ip_hdrlen(skb);&lt;/p&gt;
-&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span class="cm"&gt;/* Determine the position of this fragment. */&lt;/span&gt;
-&lt;span class="c1"&gt;//按照offset和sk_buff的len，计算出这个报文中数据的结束的位置，len表示从头部开始到最后的数据结束长度，所以计算数据的结束的位置，要减去头部的长度ihl&lt;/span&gt;
-&lt;span class="k"&gt;end&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;offset&lt;/span&gt; &lt;span class="o"&gt;+&lt;/span&gt; &lt;span class="n"&gt;skb&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;len&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt; &lt;span class="n"&gt;ihl&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-&lt;span class="n"&gt;err&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt;&lt;span class="no"&gt;EINVAL&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-&lt;span class="c1"&gt;//更新q.len，表示接收分段的最大的结束的位置。&lt;/span&gt;
-&lt;span class="cm"&gt;/* Is this the final fragment? */&lt;/span&gt;
-&lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;((&lt;/span&gt;&lt;span class="n"&gt;flags&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="no"&gt;IP_MF&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="o"&gt;==&lt;/span&gt; &lt;span class="mh"&gt;0&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
-    &lt;span class="cm"&gt;/* If we already have some bits beyond end&lt;/span&gt;
-&lt;span class="cm"&gt;     * or have different end, the segment is corrrupted.&lt;/span&gt;
-&lt;span class="cm"&gt;     */&lt;/span&gt;
-    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="k"&gt;end&lt;/span&gt; &lt;span class="o"&gt;&amp;lt;&lt;/span&gt; &lt;span class="n"&gt;qp&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;q&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;len&lt;/span&gt; &lt;span class="o"&gt;||&lt;/span&gt;
-        &lt;span class="p"&gt;((&lt;/span&gt;&lt;span class="n"&gt;qp&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;q&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;last_in&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="no"&gt;INET_FRAG_LAST_IN&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class="k"&gt;end&lt;/span&gt; &lt;span class="o"&gt;!=&lt;/span&gt; &lt;span class="n"&gt;qp&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;q&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;len&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt;
-        &lt;span class="n"&gt;goto&lt;/span&gt; &lt;span class="n"&gt;err&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-    &lt;span class="n"&gt;qp&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;q&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;last_in&lt;/span&gt; &lt;span class="o"&gt;|=&lt;/span&gt; &lt;span class="no"&gt;INET_FRAG_LAST_IN&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-    &lt;span class="n"&gt;qp&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;q&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;len&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="k"&gt;end&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-&lt;span class="p"&gt;}&lt;/span&gt; &lt;span class="k"&gt;else&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
-    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="k"&gt;end&lt;/span&gt;&lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="mh"&gt;7&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
-        &lt;span class="k"&gt;end&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;=&lt;/span&gt; &lt;span class="o"&gt;~&lt;/span&gt;&lt;span class="mh"&gt;7&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-        &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;skb&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;ip_summed&lt;/span&gt; &lt;span class="o"&gt;!=&lt;/span&gt; &lt;span class="no"&gt;CHECKSUM_UNNECESSARY&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
-            &lt;span class="n"&gt;skb&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;ip_summed&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="no"&gt;CHECKSUM_NONE&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-    &lt;span class="p"&gt;}&lt;/span&gt;
-    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="k"&gt;end&lt;/span&gt; &lt;span class="o"&gt;&amp;gt;&lt;/span&gt; &lt;span class="n"&gt;qp&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;q&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;len&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
-        &lt;span class="cm"&gt;/* Some bits beyond end -&amp;gt; corruption. */&lt;/span&gt;
-        &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;qp&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;q&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;last_in&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt; &lt;span class="no"&gt;INET_FRAG_LAST_IN&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
-            &lt;span class="n"&gt;goto&lt;/span&gt; &lt;span class="n"&gt;err&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-        &lt;span class="n"&gt;qp&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;q&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;len&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="k"&gt;end&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-    &lt;span class="p"&gt;}&lt;/span&gt;
-&lt;span class="p"&gt;}&lt;/span&gt;
-&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;p&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/p&gt;
+    ihl = ip_hdrlen(skb);
+    //按照offset和sk_buff的len，计算出这个报文中数据的结束的位置，len表示从头部开始到最后的数据结束长度，所以计算数据的结束的位置，要减去头部的长度ihl
+    end = offset + skb-&amp;gt;len - ihl;
+    err = -EINVAL;
+    //更新q.len，表示接收分段的最大的结束的位置。
+    /&lt;em&gt; Is this the final fragment? &lt;/em&gt;/
+    if ((flags &amp;amp; IP_MF) == 0) {
+        /&lt;em&gt; If we already have some bits beyond end
+         * or have different end, the segment is corrrupted.
+         &lt;/em&gt;/
+        if (end &amp;lt; qp-&amp;gt;q.len ||
+            ((qp-&amp;gt;q.last_in &amp;amp; INET_FRAG_LAST_IN) &amp;amp;&amp;amp; end != qp-&amp;gt;q.len))
+            goto err;
+        qp-&amp;gt;q.last_in |= INET_FRAG_LAST_IN;
+        qp-&amp;gt;q.len = end;
+    } else {
+        if (end&amp;amp;7) {
+            end &amp;amp;= ~7;
+            if (skb-&amp;gt;ip_summed != CHECKSUM_UNNECESSARY)
+                skb-&amp;gt;ip_summed = CHECKSUM_NONE;
+        }
+        if (end &amp;gt; qp-&amp;gt;q.len) {
+            /&lt;em&gt; Some bits beyond end -&amp;gt; corruption. &lt;/em&gt;/
+            if (qp-&amp;gt;q.last_in &amp;amp; INET_FRAG_LAST_IN)
+                goto err;
+            qp-&amp;gt;q.len = end;
+        }
+    }
+&lt;/code&gt;&lt;/pre&gt;&lt;/p&gt;
 &lt;h6&gt;2.根据offset确定在当前sk_buff在inet_frag_queue中的位置&lt;/h6&gt;
 &lt;pre&gt;&lt;code&gt;
     //首先从结尾开始尝试比较sk_buff的位置，如果大于prev，就证明sk_buff在结尾的后面，就不用递归确定位置了
@@ -889,67 +885,58 @@ static inline unsigned int inet_csk_listen_poll(const struct sock *sk)
 &lt;pre&gt;&lt;code&gt;
 inet_get_local_port_range(&amp;amp;low, &amp;amp;high); //首先确定端口号范围
         remaining = (high - low) + 1;    //表示可以尝试端口号的机会
-        smallest_rover = rover = net_random() % remaining + low;  //从端口号范围内随机选择一个端口号为起点，开始遍历选择&lt;/p&gt;
-&lt;div class="highlight"&gt;&lt;pre&gt;    &lt;span class="n"&gt;smallest_size&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;  &lt;span class="c1"&gt;//如果没有可用的端口号，会选择被reuse最少的端口号&lt;/span&gt;
-    &lt;span class="k"&gt;do&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
-        &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;inet_is_reserved_local_port&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;rover&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt;&lt;span class="c1"&gt;//如果这个随机端口号是保留的，那么不考虑&lt;/span&gt;
-            &lt;span class="k"&gt;goto&lt;/span&gt; &lt;span class="n"&gt;next_nolock&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-            &lt;span class="c1"&gt;//这里bhash是绑定端口号的hash结构，net是网络命名空间，暂时不考虑，rover是端口参考值，这里计算参考值的hash index，struct inet_bind_bucket是hash的元素，这里取hash位置的双链表的head指针&lt;/span&gt;
-        &lt;span class="n"&gt;head&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;hashinfo&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;bhash&lt;/span&gt;&lt;span class="p"&gt;[&lt;/span&gt;&lt;span class="n"&gt;inet_bhashfn&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;net&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;rover&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt;
-                &lt;span class="n"&gt;hashinfo&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;bhash_size&lt;/span&gt;&lt;span class="p"&gt;)];&lt;/span&gt; 
-        &lt;span class="n"&gt;spin_lock&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;head&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;lock&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
-        &lt;span class="c1"&gt;//遍历双链表，寻找rover的记录，如果没有找到，那就是可用的端口，如果找到了，判断状态来决定端口是否可用&lt;/span&gt;
-        &lt;span class="n"&gt;inet_bind_bucket_for_each&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;tb&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="n"&gt;node&lt;/span&gt;&lt;span class="p"&gt;,&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;head&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;chain&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
-            &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;net_eq&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;ib_net&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;tb&lt;/span&gt;&lt;span class="p"&gt;),&lt;/span&gt; &lt;span class="n"&gt;net&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class="n"&gt;tb&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;port&lt;/span&gt; &lt;span class="o"&gt;==&lt;/span&gt; &lt;span class="n"&gt;rover&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
-            &lt;span class="c1"&gt;//如果已经绑定的socket设置了reuse，同时当前socket设置了reuse，当前socket状态不是listen状态，同时这个端口的可重用的阈值是最小的，或重用阈值为-1（初始阈值），目的是找到端口重用度最小的阈值的那个端口&lt;/span&gt;
-                &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;tb&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;fastreuse&lt;/span&gt; &lt;span class="o"&gt;&amp;gt;&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&amp;amp;&lt;/span&gt;
-                    &lt;span class="n"&gt;sk&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;sk_reuse&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&amp;amp;&lt;/span&gt;
-                    &lt;span class="n"&gt;sk&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;sk_state&lt;/span&gt; &lt;span class="o"&gt;!=&lt;/span&gt; &lt;span class="n"&gt;TCP_LISTEN&lt;/span&gt; &lt;span class="o"&gt;&amp;amp;&amp;amp;&lt;/span&gt;
-                    &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;tb&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;num_owners&lt;/span&gt; &lt;span class="o"&gt;&amp;lt;&lt;/span&gt; &lt;span class="n"&gt;smallest_size&lt;/span&gt; &lt;span class="o"&gt;||&lt;/span&gt; &lt;span class="n"&gt;smallest_size&lt;/span&gt; &lt;span class="o"&gt;==&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;))&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
-                    &lt;span class="c1"&gt;//更新阈值&lt;/span&gt;
-                    &lt;span class="n"&gt;smallest_size&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;tb&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;num_owners&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-                    &lt;span class="n"&gt;smallest_rover&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;rover&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;&lt;span class="c1"&gt;//保存这个最小阈值的端口&lt;/span&gt;
-                    &lt;span class="c1"&gt;//如果端口bind hash已经有了足够多的绑定端口，那么当前端口就是备选。避免了遍历数量很多的bind hash，这个应该是内核中的一个小小的优化吧。以前的版本没看过&lt;/span&gt;
-                    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;atomic_read&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;hashinfo&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;bsockets&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="o"&gt;&amp;gt;&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;high&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt; &lt;span class="n"&gt;low&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="o"&gt;+&lt;/span&gt; &lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
-                        &lt;span class="n"&gt;spin_unlock&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;head&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;lock&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
-                        &lt;span class="n"&gt;snum&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;smallest_rover&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-                        &lt;span class="k"&gt;goto&lt;/span&gt; &lt;span class="n"&gt;have_snum&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-                    &lt;span class="p"&gt;}&lt;/span&gt;
-                &lt;span class="p"&gt;}&lt;/span&gt;
-                &lt;span class="k"&gt;goto&lt;/span&gt; &lt;span class="n"&gt;next&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-            &lt;span class="p"&gt;}&lt;/span&gt;
-        &lt;span class="c1"&gt;//到了这里表示端口已经找到并且这个端口&lt;/span&gt;
-        &lt;span class="k"&gt;break&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-    &lt;span class="nl"&gt;next:&lt;/span&gt;
-        &lt;span class="n"&gt;spin_unlock&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;&amp;amp;&lt;/span&gt;&lt;span class="n"&gt;head&lt;/span&gt;&lt;span class="o"&gt;-&amp;gt;&lt;/span&gt;&lt;span class="n"&gt;lock&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
-    &lt;span class="nl"&gt;next_nolock:&lt;/span&gt;
-        &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;++&lt;/span&gt;&lt;span class="n"&gt;rover&lt;/span&gt; &lt;span class="o"&gt;&amp;gt;&lt;/span&gt; &lt;span class="n"&gt;high&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
-            &lt;span class="n"&gt;rover&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;low&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-    &lt;span class="p"&gt;}&lt;/span&gt; &lt;span class="k"&gt;while&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="o"&gt;--&lt;/span&gt;&lt;span class="n"&gt;remaining&lt;/span&gt; &lt;span class="o"&gt;&amp;gt;&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
-
-    &lt;span class="cm"&gt;/* Exhausted local port range during search?  It is not&lt;/span&gt;
-&lt;span class="cm"&gt;     * possible for us to be holding one of the bind hash&lt;/span&gt;
-&lt;span class="cm"&gt;     * locks if this test triggers, because if &amp;#39;remaining&amp;#39;&lt;/span&gt;
-&lt;span class="cm"&gt;     * drops to zero, we broke out of the do/while loop at&lt;/span&gt;
-&lt;span class="cm"&gt;     * the top level, not from the &amp;#39;break;&amp;#39; statement.&lt;/span&gt;
-&lt;span class="cm"&gt;     */&lt;/span&gt;
-     &lt;span class="c1"&gt;//已经遍历了一遍了，如果阈值（smallest_rover）还是-1，那么证明所有端口都被占用，同时都为设置reuse，那么只能失败了，否则使用reuse占用最少的端口，这种情况也是端口都被占用，但是有一些是reuse的，并且当前的端口是reuse的。&lt;/span&gt;
-    &lt;span class="n"&gt;ret&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;remaining&lt;/span&gt; &lt;span class="o"&gt;&amp;lt;=&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
-        &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;smallest_size&lt;/span&gt; &lt;span class="o"&gt;!=&lt;/span&gt; &lt;span class="o"&gt;-&lt;/span&gt;&lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
-            &lt;span class="n"&gt;snum&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;smallest_rover&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-            &lt;span class="k"&gt;goto&lt;/span&gt; &lt;span class="n"&gt;have_snum&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-        &lt;span class="p"&gt;}&lt;/span&gt;
-        &lt;span class="k"&gt;goto&lt;/span&gt; &lt;span class="n"&gt;fail&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-    &lt;span class="p"&gt;}&lt;/span&gt;
-    &lt;span class="cm"&gt;/* OK, here is the one we will use.  HEAD is&lt;/span&gt;
-&lt;span class="cm"&gt;     * non-NULL and we hold it&amp;#39;s mutex.&lt;/span&gt;
-&lt;span class="cm"&gt;     */&lt;/span&gt;
-    &lt;span class="n"&gt;snum&lt;/span&gt; &lt;span class="o"&gt;=&lt;/span&gt; &lt;span class="n"&gt;rover&lt;/span&gt;&lt;span class="p"&gt;;&lt;/span&gt;
-&lt;/pre&gt;&lt;/div&gt;
-
-
-&lt;p&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/p&gt;
+        smallest_rover = rover = net_random() % remaining + low;&lt;br /&gt;
+        //从端口号范围内随机选择一个端口号为起点，开始遍历选择
+        smallest_size = -1;  //如果没有可用的端口号，会选择被reuse最少的端口号
+        do {
+            if (inet_is_reserved_local_port(rover))//如果这个随机端口号是保留的，那么不考虑
+                goto next_nolock;
+                //这里bhash是绑定端口号的hash结构，net是网络命名空间，暂时不考虑，rover是端口参考值，这里计算参考值的hash index，struct inet_bind_bucket是hash的元素，这里取hash位置的双链表的head指针
+            head = &amp;amp;hashinfo-&amp;gt;bhash[inet_bhashfn(net, rover,
+                    hashinfo-&amp;gt;bhash_size)]; 
+            spin_lock(&amp;amp;head-&amp;gt;lock);
+            //遍历双链表，寻找rover的记录，如果没有找到，那就是可用的端口，如果找到了，判断状态来决定端口是否可用
+            inet_bind_bucket_for_each(tb, node, &amp;amp;head-&amp;gt;chain)
+                if (net_eq(ib_net(tb), net) &amp;amp;&amp;amp; tb-&amp;gt;port == rover) {
+                //如果已经绑定的socket设置了reuse，同时当前socket设置了reuse，当前socket状态不是listen状态，同时这个端口的可重用的阈值是最小的，或重用阈值为-1（初始阈值），目的是找到端口重用度最小的阈值的那个端口
+                    if (tb-&amp;gt;fastreuse &amp;gt; 0 &amp;amp;&amp;amp;
+                        sk-&amp;gt;sk_reuse &amp;amp;&amp;amp;
+                        sk-&amp;gt;sk_state != TCP_LISTEN &amp;amp;&amp;amp;
+                        (tb-&amp;gt;num_owners &amp;lt; smallest_size || smallest_size == -1)) {
+                        //更新阈值
+                        smallest_size = tb-&amp;gt;num_owners;
+                        smallest_rover = rover;//保存这个最小阈值的端口
+                        //如果端口bind hash已经有了足够多的绑定端口，那么当前端口就是备选。避免了遍历数量很多的bind hash，这个应该是内核中的一个小小的优化吧。以前的版本没看过
+                        if (atomic_read(&amp;amp;hashinfo-&amp;gt;bsockets) &amp;gt; (high - low) + 1) {
+                            spin_unlock(&amp;amp;head-&amp;gt;lock);
+                            snum = smallest_rover;
+                            goto have_snum;
+                        }
+                    }
+                    goto next;
+                }
+            //到了这里表示端口已经找到并且这个端口
+            break;
+        next:
+            spin_unlock(&amp;amp;head-&amp;gt;lock);
+        next_nolock:
+            if (++rover &amp;gt; high)
+                rover = low;
+        } while (--remaining &amp;gt; 0);
+         //已经遍历了一遍了，如果阈值（smallest_rover）还是-1，那么证明所有端口都被占用，同时都为设置reuse，那么只能失败了，否则使用reuse占用最少的端口，这种情况也是端口都被占用，但是有一些是reuse的，并且当前的端口是reuse的。
+        ret = 1;
+        if (remaining &amp;lt;= 0) {
+            if (smallest_size != -1) {
+                snum = smallest_rover;
+                goto have_snum;
+            }
+            goto fail;
+        }
+        /&lt;em&gt; OK, here is the one we will use.  HEAD is
+         * non-NULL and we hold it's mutex.
+         &lt;/em&gt;/
+        snum = rover;
+&lt;/code&gt;&lt;/pre&gt;&lt;/p&gt;
 &lt;p&gt;1.未指定端口号&lt;/p&gt;
 &lt;p&gt;net/ipv4/inet_connection_sock.c&lt;/p&gt;
 &lt;pre&gt;&lt;code&gt;

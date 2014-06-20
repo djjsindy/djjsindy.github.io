@@ -132,67 +132,58 @@
 <pre><code>
 inet_get_local_port_range(&amp;low, &amp;high); //首先确定端口号范围
         remaining = (high - low) + 1;    //表示可以尝试端口号的机会
-        smallest_rover = rover = net_random() % remaining + low;  //从端口号范围内随机选择一个端口号为起点，开始遍历选择</p>
-<div class="highlight"><pre>    <span class="n">smallest_size</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">;</span>  <span class="c1">//如果没有可用的端口号，会选择被reuse最少的端口号</span>
-    <span class="k">do</span> <span class="p">{</span>
-        <span class="k">if</span> <span class="p">(</span><span class="n">inet_is_reserved_local_port</span><span class="p">(</span><span class="n">rover</span><span class="p">))</span><span class="c1">//如果这个随机端口号是保留的，那么不考虑</span>
-            <span class="k">goto</span> <span class="n">next_nolock</span><span class="p">;</span>
-            <span class="c1">//这里bhash是绑定端口号的hash结构，net是网络命名空间，暂时不考虑，rover是端口参考值，这里计算参考值的hash index，struct inet_bind_bucket是hash的元素，这里取hash位置的双链表的head指针</span>
-        <span class="n">head</span> <span class="o">=</span> <span class="o">&amp;</span><span class="n">hashinfo</span><span class="o">-&gt;</span><span class="n">bhash</span><span class="p">[</span><span class="n">inet_bhashfn</span><span class="p">(</span><span class="n">net</span><span class="p">,</span> <span class="n">rover</span><span class="p">,</span>
-                <span class="n">hashinfo</span><span class="o">-&gt;</span><span class="n">bhash_size</span><span class="p">)];</span> 
-        <span class="n">spin_lock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">head</span><span class="o">-&gt;</span><span class="n">lock</span><span class="p">);</span>
-        <span class="c1">//遍历双链表，寻找rover的记录，如果没有找到，那就是可用的端口，如果找到了，判断状态来决定端口是否可用</span>
-        <span class="n">inet_bind_bucket_for_each</span><span class="p">(</span><span class="n">tb</span><span class="p">,</span> <span class="n">node</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">head</span><span class="o">-&gt;</span><span class="n">chain</span><span class="p">)</span>
-            <span class="k">if</span> <span class="p">(</span><span class="n">net_eq</span><span class="p">(</span><span class="n">ib_net</span><span class="p">(</span><span class="n">tb</span><span class="p">),</span> <span class="n">net</span><span class="p">)</span> <span class="o">&amp;&amp;</span> <span class="n">tb</span><span class="o">-&gt;</span><span class="n">port</span> <span class="o">==</span> <span class="n">rover</span><span class="p">)</span> <span class="p">{</span>
-            <span class="c1">//如果已经绑定的socket设置了reuse，同时当前socket设置了reuse，当前socket状态不是listen状态，同时这个端口的可重用的阈值是最小的，或重用阈值为-1（初始阈值），目的是找到端口重用度最小的阈值的那个端口</span>
-                <span class="k">if</span> <span class="p">(</span><span class="n">tb</span><span class="o">-&gt;</span><span class="n">fastreuse</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="o">&amp;&amp;</span>
-                    <span class="n">sk</span><span class="o">-&gt;</span><span class="n">sk_reuse</span> <span class="o">&amp;&amp;</span>
-                    <span class="n">sk</span><span class="o">-&gt;</span><span class="n">sk_state</span> <span class="o">!=</span> <span class="n">TCP_LISTEN</span> <span class="o">&amp;&amp;</span>
-                    <span class="p">(</span><span class="n">tb</span><span class="o">-&gt;</span><span class="n">num_owners</span> <span class="o">&lt;</span> <span class="n">smallest_size</span> <span class="o">||</span> <span class="n">smallest_size</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">))</span> <span class="p">{</span>
-                    <span class="c1">//更新阈值</span>
-                    <span class="n">smallest_size</span> <span class="o">=</span> <span class="n">tb</span><span class="o">-&gt;</span><span class="n">num_owners</span><span class="p">;</span>
-                    <span class="n">smallest_rover</span> <span class="o">=</span> <span class="n">rover</span><span class="p">;</span><span class="c1">//保存这个最小阈值的端口</span>
-                    <span class="c1">//如果端口bind hash已经有了足够多的绑定端口，那么当前端口就是备选。避免了遍历数量很多的bind hash，这个应该是内核中的一个小小的优化吧。以前的版本没看过</span>
-                    <span class="k">if</span> <span class="p">(</span><span class="n">atomic_read</span><span class="p">(</span><span class="o">&amp;</span><span class="n">hashinfo</span><span class="o">-&gt;</span><span class="n">bsockets</span><span class="p">)</span> <span class="o">&gt;</span> <span class="p">(</span><span class="n">high</span> <span class="o">-</span> <span class="n">low</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="p">{</span>
-                        <span class="n">spin_unlock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">head</span><span class="o">-&gt;</span><span class="n">lock</span><span class="p">);</span>
-                        <span class="n">snum</span> <span class="o">=</span> <span class="n">smallest_rover</span><span class="p">;</span>
-                        <span class="k">goto</span> <span class="n">have_snum</span><span class="p">;</span>
-                    <span class="p">}</span>
-                <span class="p">}</span>
-                <span class="k">goto</span> <span class="n">next</span><span class="p">;</span>
-            <span class="p">}</span>
-        <span class="c1">//到了这里表示端口已经找到并且这个端口</span>
-        <span class="k">break</span><span class="p">;</span>
-    <span class="nl">next:</span>
-        <span class="n">spin_unlock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">head</span><span class="o">-&gt;</span><span class="n">lock</span><span class="p">);</span>
-    <span class="nl">next_nolock:</span>
-        <span class="k">if</span> <span class="p">(</span><span class="o">++</span><span class="n">rover</span> <span class="o">&gt;</span> <span class="n">high</span><span class="p">)</span>
-            <span class="n">rover</span> <span class="o">=</span> <span class="n">low</span><span class="p">;</span>
-    <span class="p">}</span> <span class="k">while</span> <span class="p">(</span><span class="o">--</span><span class="n">remaining</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">);</span>
-
-    <span class="cm">/* Exhausted local port range during search?  It is not</span>
-<span class="cm">     * possible for us to be holding one of the bind hash</span>
-<span class="cm">     * locks if this test triggers, because if &#39;remaining&#39;</span>
-<span class="cm">     * drops to zero, we broke out of the do/while loop at</span>
-<span class="cm">     * the top level, not from the &#39;break;&#39; statement.</span>
-<span class="cm">     */</span>
-     <span class="c1">//已经遍历了一遍了，如果阈值（smallest_rover）还是-1，那么证明所有端口都被占用，同时都为设置reuse，那么只能失败了，否则使用reuse占用最少的端口，这种情况也是端口都被占用，但是有一些是reuse的，并且当前的端口是reuse的。</span>
-    <span class="n">ret</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
-    <span class="k">if</span> <span class="p">(</span><span class="n">remaining</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
-        <span class="k">if</span> <span class="p">(</span><span class="n">smallest_size</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="p">{</span>
-            <span class="n">snum</span> <span class="o">=</span> <span class="n">smallest_rover</span><span class="p">;</span>
-            <span class="k">goto</span> <span class="n">have_snum</span><span class="p">;</span>
-        <span class="p">}</span>
-        <span class="k">goto</span> <span class="n">fail</span><span class="p">;</span>
-    <span class="p">}</span>
-    <span class="cm">/* OK, here is the one we will use.  HEAD is</span>
-<span class="cm">     * non-NULL and we hold it&#39;s mutex.</span>
-<span class="cm">     */</span>
-    <span class="n">snum</span> <span class="o">=</span> <span class="n">rover</span><span class="p">;</span>
-</pre></div>
-
-
-<p></code></pre></p>
+        smallest_rover = rover = net_random() % remaining + low;<br />
+        //从端口号范围内随机选择一个端口号为起点，开始遍历选择
+        smallest_size = -1;  //如果没有可用的端口号，会选择被reuse最少的端口号
+        do {
+            if (inet_is_reserved_local_port(rover))//如果这个随机端口号是保留的，那么不考虑
+                goto next_nolock;
+                //这里bhash是绑定端口号的hash结构，net是网络命名空间，暂时不考虑，rover是端口参考值，这里计算参考值的hash index，struct inet_bind_bucket是hash的元素，这里取hash位置的双链表的head指针
+            head = &amp;hashinfo-&gt;bhash[inet_bhashfn(net, rover,
+                    hashinfo-&gt;bhash_size)]; 
+            spin_lock(&amp;head-&gt;lock);
+            //遍历双链表，寻找rover的记录，如果没有找到，那就是可用的端口，如果找到了，判断状态来决定端口是否可用
+            inet_bind_bucket_for_each(tb, node, &amp;head-&gt;chain)
+                if (net_eq(ib_net(tb), net) &amp;&amp; tb-&gt;port == rover) {
+                //如果已经绑定的socket设置了reuse，同时当前socket设置了reuse，当前socket状态不是listen状态，同时这个端口的可重用的阈值是最小的，或重用阈值为-1（初始阈值），目的是找到端口重用度最小的阈值的那个端口
+                    if (tb-&gt;fastreuse &gt; 0 &amp;&amp;
+                        sk-&gt;sk_reuse &amp;&amp;
+                        sk-&gt;sk_state != TCP_LISTEN &amp;&amp;
+                        (tb-&gt;num_owners &lt; smallest_size || smallest_size == -1)) {
+                        //更新阈值
+                        smallest_size = tb-&gt;num_owners;
+                        smallest_rover = rover;//保存这个最小阈值的端口
+                        //如果端口bind hash已经有了足够多的绑定端口，那么当前端口就是备选。避免了遍历数量很多的bind hash，这个应该是内核中的一个小小的优化吧。以前的版本没看过
+                        if (atomic_read(&amp;hashinfo-&gt;bsockets) &gt; (high - low) + 1) {
+                            spin_unlock(&amp;head-&gt;lock);
+                            snum = smallest_rover;
+                            goto have_snum;
+                        }
+                    }
+                    goto next;
+                }
+            //到了这里表示端口已经找到并且这个端口
+            break;
+        next:
+            spin_unlock(&amp;head-&gt;lock);
+        next_nolock:
+            if (++rover &gt; high)
+                rover = low;
+        } while (--remaining &gt; 0);
+         //已经遍历了一遍了，如果阈值（smallest_rover）还是-1，那么证明所有端口都被占用，同时都为设置reuse，那么只能失败了，否则使用reuse占用最少的端口，这种情况也是端口都被占用，但是有一些是reuse的，并且当前的端口是reuse的。
+        ret = 1;
+        if (remaining &lt;= 0) {
+            if (smallest_size != -1) {
+                snum = smallest_rover;
+                goto have_snum;
+            }
+            goto fail;
+        }
+        /<em> OK, here is the one we will use.  HEAD is
+         * non-NULL and we hold it's mutex.
+         </em>/
+        snum = rover;
+</code></pre></p>
 <p>1.未指定端口号</p>
 <p>net/ipv4/inet_connection_sock.c</p>
 <pre><code>
@@ -418,14 +409,14 @@ void inet_bind_hash(struct sock *sk, struct inet_bind_bucket *tb,
         <i class="icon-tag icon-large"></i>socket
     </a>
 </li>
-<li class="tag-2">
-    <a href="/tag/tomcat.html">
-        <i class="icon-tag icon-large"></i>tomcat
-    </a>
-</li>
 <li class="tag-1">
     <a href="/tag/nginx.html">
         <i class="icon-tag icon-large"></i>nginx
+    </a>
+</li>
+<li class="tag-2">
+    <a href="/tag/tomcat.html">
+        <i class="icon-tag icon-large"></i>tomcat
     </a>
 </li>
 <li class="tag-2">

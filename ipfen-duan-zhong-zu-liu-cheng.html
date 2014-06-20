@@ -232,39 +232,35 @@ if (ip_hdr(skb)->frag_off & htons(IP_MF | IP_OFFSET)) {
     flags = offset &amp; ~IP_OFFSET; //获得3位标志位
     offset &amp;= IP_OFFSET; //13位片内偏移
     offset &lt;&lt;= 3;       /<em> offset is in 8-byte chunks </em>///13位片内偏移，这个表示按照8位为一个偏移，所以要乘以8
-    ihl = ip_hdrlen(skb);</p>
-<div class="highlight"><pre><span class="cm">/* Determine the position of this fragment. */</span>
-<span class="c1">//按照offset和sk_buff的len，计算出这个报文中数据的结束的位置，len表示从头部开始到最后的数据结束长度，所以计算数据的结束的位置，要减去头部的长度ihl</span>
-<span class="k">end</span> <span class="o">=</span> <span class="n">offset</span> <span class="o">+</span> <span class="n">skb</span><span class="o">-&gt;</span><span class="n">len</span> <span class="o">-</span> <span class="n">ihl</span><span class="p">;</span>
-<span class="n">err</span> <span class="o">=</span> <span class="o">-</span><span class="no">EINVAL</span><span class="p">;</span>
-<span class="c1">//更新q.len，表示接收分段的最大的结束的位置。</span>
-<span class="cm">/* Is this the final fragment? */</span>
-<span class="k">if</span> <span class="p">((</span><span class="n">flags</span> <span class="o">&amp;</span> <span class="no">IP_MF</span><span class="p">)</span> <span class="o">==</span> <span class="mh">0</span><span class="p">)</span> <span class="p">{</span>
-    <span class="cm">/* If we already have some bits beyond end</span>
-<span class="cm">     * or have different end, the segment is corrrupted.</span>
-<span class="cm">     */</span>
-    <span class="k">if</span> <span class="p">(</span><span class="k">end</span> <span class="o">&lt;</span> <span class="n">qp</span><span class="o">-&gt;</span><span class="n">q</span><span class="p">.</span><span class="n">len</span> <span class="o">||</span>
-        <span class="p">((</span><span class="n">qp</span><span class="o">-&gt;</span><span class="n">q</span><span class="p">.</span><span class="n">last_in</span> <span class="o">&amp;</span> <span class="no">INET_FRAG_LAST_IN</span><span class="p">)</span> <span class="o">&amp;&amp;</span> <span class="k">end</span> <span class="o">!=</span> <span class="n">qp</span><span class="o">-&gt;</span><span class="n">q</span><span class="p">.</span><span class="n">len</span><span class="p">))</span>
-        <span class="n">goto</span> <span class="n">err</span><span class="p">;</span>
-    <span class="n">qp</span><span class="o">-&gt;</span><span class="n">q</span><span class="p">.</span><span class="n">last_in</span> <span class="o">|=</span> <span class="no">INET_FRAG_LAST_IN</span><span class="p">;</span>
-    <span class="n">qp</span><span class="o">-&gt;</span><span class="n">q</span><span class="p">.</span><span class="n">len</span> <span class="o">=</span> <span class="k">end</span><span class="p">;</span>
-<span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
-    <span class="k">if</span> <span class="p">(</span><span class="k">end</span><span class="o">&amp;</span><span class="mh">7</span><span class="p">)</span> <span class="p">{</span>
-        <span class="k">end</span> <span class="o">&amp;=</span> <span class="o">~</span><span class="mh">7</span><span class="p">;</span>
-        <span class="k">if</span> <span class="p">(</span><span class="n">skb</span><span class="o">-&gt;</span><span class="n">ip_summed</span> <span class="o">!=</span> <span class="no">CHECKSUM_UNNECESSARY</span><span class="p">)</span>
-            <span class="n">skb</span><span class="o">-&gt;</span><span class="n">ip_summed</span> <span class="o">=</span> <span class="no">CHECKSUM_NONE</span><span class="p">;</span>
-    <span class="p">}</span>
-    <span class="k">if</span> <span class="p">(</span><span class="k">end</span> <span class="o">&gt;</span> <span class="n">qp</span><span class="o">-&gt;</span><span class="n">q</span><span class="p">.</span><span class="n">len</span><span class="p">)</span> <span class="p">{</span>
-        <span class="cm">/* Some bits beyond end -&gt; corruption. */</span>
-        <span class="k">if</span> <span class="p">(</span><span class="n">qp</span><span class="o">-&gt;</span><span class="n">q</span><span class="p">.</span><span class="n">last_in</span> <span class="o">&amp;</span> <span class="no">INET_FRAG_LAST_IN</span><span class="p">)</span>
-            <span class="n">goto</span> <span class="n">err</span><span class="p">;</span>
-        <span class="n">qp</span><span class="o">-&gt;</span><span class="n">q</span><span class="p">.</span><span class="n">len</span> <span class="o">=</span> <span class="k">end</span><span class="p">;</span>
-    <span class="p">}</span>
-<span class="p">}</span>
-</pre></div>
-
-
-<p></code></pre></p>
+    ihl = ip_hdrlen(skb);
+    //按照offset和sk_buff的len，计算出这个报文中数据的结束的位置，len表示从头部开始到最后的数据结束长度，所以计算数据的结束的位置，要减去头部的长度ihl
+    end = offset + skb-&gt;len - ihl;
+    err = -EINVAL;
+    //更新q.len，表示接收分段的最大的结束的位置。
+    /<em> Is this the final fragment? </em>/
+    if ((flags &amp; IP_MF) == 0) {
+        /<em> If we already have some bits beyond end
+         * or have different end, the segment is corrrupted.
+         </em>/
+        if (end &lt; qp-&gt;q.len ||
+            ((qp-&gt;q.last_in &amp; INET_FRAG_LAST_IN) &amp;&amp; end != qp-&gt;q.len))
+            goto err;
+        qp-&gt;q.last_in |= INET_FRAG_LAST_IN;
+        qp-&gt;q.len = end;
+    } else {
+        if (end&amp;7) {
+            end &amp;= ~7;
+            if (skb-&gt;ip_summed != CHECKSUM_UNNECESSARY)
+                skb-&gt;ip_summed = CHECKSUM_NONE;
+        }
+        if (end &gt; qp-&gt;q.len) {
+            /<em> Some bits beyond end -&gt; corruption. </em>/
+            if (qp-&gt;q.last_in &amp; INET_FRAG_LAST_IN)
+                goto err;
+            qp-&gt;q.len = end;
+        }
+    }
+</code></pre></p>
 <h6>2.根据offset确定在当前sk_buff在inet_frag_queue中的位置</h6>
 <pre><code>
     //首先从结尾开始尝试比较sk_buff的位置，如果大于prev，就证明sk_buff在结尾的后面，就不用递归确定位置了
@@ -534,14 +530,14 @@ int inet_frag_evictor(struct netns_frags <em>nf, struct inet_frags </em>f)
         <i class="icon-tag icon-large"></i>socket
     </a>
 </li>
-<li class="tag-2">
-    <a href="/tag/tomcat.html">
-        <i class="icon-tag icon-large"></i>tomcat
-    </a>
-</li>
 <li class="tag-1">
     <a href="/tag/nginx.html">
         <i class="icon-tag icon-large"></i>nginx
+    </a>
+</li>
+<li class="tag-2">
+    <a href="/tag/tomcat.html">
+        <i class="icon-tag icon-large"></i>tomcat
     </a>
 </li>
 <li class="tag-2">
