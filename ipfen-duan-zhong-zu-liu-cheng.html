@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>ip分段重组流程</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="">
+    <meta name="author" content="djjsindy">
+
+    <!-- Le styles -->
+    <link rel="stylesheet" href="/theme/css/bootstrap.min.css" type="text/css" />
+    <style type="text/css">
+      body {
+        padding-top: 60px;
+        padding-bottom: 40px;
+      }
+      .sidebar-nav {
+        padding: 9px 0;
+      }
+      .tag-1 {
+        font-size: 13pt;
+      }
+      .tag-2 {
+        font-size: 10pt;
+      }
+      .tag-2 {
+        font-size: 8pt;
+      }
+      .tag-4 {
+        font-size: 6pt;
+     }
+    </style>
+    <link href="/theme/css/bootstrap-responsive.min.css" rel="stylesheet">
+        <link href="/theme/css/font-awesome.css" rel="stylesheet">
+
+    <link href="/theme/css/pygments.css" rel="stylesheet">
+
+    <!-- Le HTML5 shim, for IE6-8 support of HTML5 elements -->
+    <!--[if lt IE 9]>
+      <script src="//html5shim.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+
+    <!-- Le fav and touch icons -->
+    <link rel="shortcut icon" href="/theme/images/favicon.ico">
+    <link rel="apple-touch-icon" href="/theme/images/apple-touch-icon.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="/theme/images/apple-touch-icon-72x72.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="/theme/images/apple-touch-icon-114x114.png">
+
+    <link href="/" type="application/atom+xml" rel="alternate" title="djjsindy ATOM Feed" />
+
+  </head>
+
+  <body>
+
+    <div class="navbar navbar-fixed-top">
+      <div class="navbar-inner">
+        <div class="container-fluid">
+          <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </a>
+          <a class="brand" href="/index.html">djjsindy </a>
+          <div class="nav-collapse">
+            <ul class="nav">
+                          <li class="divider-vertical"></li>
+                  <li >
+                    <a href="/category/nginx.html">
+						<i class="icon-folder-open icon-large"></i>nginx
+					</a>
+                  </li>
+                  <li >
+                    <a href="/category/ptmalloc.html">
+						<i class="icon-folder-open icon-large"></i>ptmalloc
+					</a>
+                  </li>
+                  <li class="active">
+                    <a href="/category/socket.html">
+						<i class="icon-folder-open icon-large"></i>socket
+					</a>
+                  </li>
+                  <li >
+                    <a href="/category/tomcat.html">
+						<i class="icon-folder-open icon-large"></i>tomcat
+					</a>
+                  </li>
+
+                          <ul class="nav pull-right">
+                                <li><a href="/archives.html"><i class="icon-th-list"></i>Archives</a></li>
+                          </ul>
+
+            </ul>
+            <!--<p class="navbar-text pull-right">Logged in as <a href="#">username</a></p>-->
+          </div><!--/.nav-collapse -->
+        </div>
+      </div>
+    </div>
+
+    <div class="container-fluid">
+      <div class="row">
+        <div class="span9" id="content">
+<section id="content">
+        <article>
+                <header>
+                        <h1>
+                                <a href=""
+                                        rel="bookmark"
+                                        title="Permalink to ip分段重组流程">
+                                        ip分段重组流程
+                                </a>
+                        </h1>
+                </header>
+                <div class="entry-content">
+                <div class="well">
+<footer class="post-info">
+<span class="label">Date</span>
+<abbr class="published" title="2014-06-20T15:28:00">
+        <i class="icon-calendar"></i>Fri 20 June 2014
+</abbr>
+<span class="label">By</span>
+<a href="/author/djjsindy.html"><i class="icon-user"></i>djjsindy</a>
+<span class="label">Category</span>
+<a href="/category/socket.html"><i class="icon-folder-open"></i>socket</a>.
+
+
+<span class="label">Tags</span>
+	<a href="/tag/socket.html"><i class="icon-tag"></i>socket</a>
+</footer><!-- /.post-info -->                </div>
+                <h1>ip分段重组流程</h1>
+<p>数据链路层会限制发送网络帧的长度(mtu)，这样如果网络层发送的报文长度如果超过了mtu，那么ip协议会将发送的报文进行拆分分段。</p>
+<p>ip协议报文结构</p>
+<p><img src="http://i1166.photobucket.com/albums/q601/djjsindy/my%20blog/ScreenShot2014-06-18at30145PM_zpsb61308ae.png" width="300"></p>
+<p>ip协议中主要控制分段的部分是</p>
+<ol>
+<li>
+<p>16位标识符，同一个ip报文的多个分段具有相同的16位标识，网络层会根据这个标识来找到其他的已经收到的分段。</p>
+</li>
+<li>
+<p>3位标志，第一位暂时不用；第二位表示是否开启分段，1表示开启分段，0表示没有分段；第三位表示开启分段，是否到了分段的最后的一个分段，0表示到了最后一个分段，1表示还有其他的分段。</p>
+</li>
+<li>13位片内偏移，ip分段的位移以8字节作为单位，真实偏移字节数是13位片内位移＊8</li>
+</ol>
+<p>ip协议有这么几个特点，数据报可能会丢失、重复传输、延迟、乱序，针对分段重组需要解决这几个问题</p>
+<ol>
+<li>分段之间的重叠问题，如何解决？</li>
+<li>如果某一个ip报文中的某个分段丢失，长时间收不到这个分段，相关结构如何回收，如果不回收肯定会撑爆内存？</li>
+<li>所有分组的分配的内存都有一个限制，如果内存分配达到阈值，如何回收相关的结构？</li>
+</ol>
+<h3>分段初始化</h3>
+<p>内核用struct inet_frag_queue来记录同一ip报文的多个分组</p>
+<pre><code>
+struct inet_frag_queue {
+    struct hlist_node   list;
+    struct netns_frags  *net; 
+    //当这个ip报文重组完成之后，就把当前结构体加入到回收链表中，方便当内存紧张的时候，达到阈值的时候回收lru_list中的inet_frag_queue
+    struct list_head    lru_list;   /* lru list member */
+    spinlock_t      lock;
+    atomic_t        refcnt;
+    //当分段超时的时候，timer用于回收内存
+    struct timer_list   timer;      /* when will this queue expire? */
+    //记录sk_buff链表，每一个sk_buff是分段链表
+    struct sk_buff      *fragments; /* list of received fragments */
+    //记录分段链表的尾，这个字段是为了加速确定分段的位置，每个分段用offset跟tail比较，若比tail小，那么需要递归确定新分段的位置；如果比tail大，那么就不需要递归了
+    struct sk_buff      *fragments_tail;
+    ktime_t         stamp;
+    //记录当前接受分组最大的结束的位置
+    int         len;        /* total length of orig datagram */
+    //记录分组一共接受的数据字节数，当meat＝len的时候表示所有得分段都接受完毕了
+    int         meat;
+    __u8            last_in;    /* first/last segment arrived? */
+
+#define INET_FRAG_COMPLETE  4 //表示分段都接收完毕
+#define INET_FRAG_FIRST_IN  2 //表示接收一个位置分段
+#define INET_FRAG_LAST_IN   1 //表示接收最后一个位置的分段
+};
+</code></pre>
+
+<p>inet_frag_queue表示同一个ip报文的多个分段，这个结构被存在一个hash表中，根据id，源ip，目的ip，传输层协议号来作为key，能够快速的找到这个inet_frag_queue，如果没有找到这个结构，就会初始化一个inet_frag_queue。</p>
+<p>系统启动时的分段初始化函数，ip4_frags参数是一个全局配置参数。
+<pre><code>
+void __init ipfrag_init(void)
+{
+    ip4_frags_ctl_register();
+    register_pernet_subsys(&amp;ip4_frags_ops);
+    ip4_frags.hashfn = ip4_hashfn;  //存储inet_frag_queue的hash结构
+    ip4_frags.constructor = ip4_frag_init; //每一个inet_frag_queue初始化函数，当当前分段在hash中找不到结构，那么就需要调用这个回调函数
+    ip4_frags.destructor = ip4_frag_free; //当内存分配达到上限的时候，就调用这个回调函数，回收inet_frag_queue
+    ip4_frags.skb_free = NULL;
+    ip4_frags.qsize = sizeof(struct ipq);//每次分配inet_frag_queue结构的时候，每个结构体的大小就是每次分配的内存大小
+    ip4_frags.match = ip4_frag_match;
+    ip4_frags.frag_expire = ip_expire; //当一个ip报文的某个分组在一段时间内未接收完全，就抛弃这个ip报文
+    ip4_frags.secret_interval = 10 * 60 * HZ;//在根据ip报文计算inet_frag_queue hash值需要一个secret，这个secret是一直在变化的，这个参数是变化的间隔
+    inet_frags_init(&amp;ip4_frags);
+}
+</code></pre>
+ip4_frags_ops的初始化函数
+<pre><code>
+static int __net_init ipv4_frags_init_net(struct net *net)
+{  <br />
+    net-&gt;ipv4.frags.high_thresh = 256 * 1024; //内存上限，当超过这个数值的时候开始回收inet_frag_queue
+    net-&gt;ipv4.frags.low_thresh = 192 * 1024; //回收内存尽可能的回收到这个数值之下
+    net-&gt;ipv4.frags.timeout = IP_FRAG_TIME; //30HZ,一个ip报文收集全所有分段的过期时间，如果超过这段时间，就会回收分配的inet_frag_queue结构
+    inet_frags_init_net(&amp;net-&gt;ipv4.frags);
+    return ip4_frags_ns_ctl_register(net);
+}
+</code></pre></p>
+<h3>分段重组</h3>
+<p>linux内核在网路层向传输层提交数据之前会检查接收到的ip报文，检查3位标志位和后面的13位偏移。</p>
+<pre><code>
+//frag_off是3位标志位和13位片内偏移总和，如果不是最后一个分片或者有片偏移就进行重组分段
+if (ip_hdr(skb)->frag_off & htons(IP_MF | IP_OFFSET)) {
+        if (ip_defrag(skb, IP_DEFRAG_LOCAL_DELIVER))
+            return 0;
+    }
+</code></pre>
+
+<p>ip_defrag的流程是从ip4_frags的hash表中查询是否有相关的inet_frag_queue结构，如果有就返回，把当前的sk_buff加入到inet_frag_queue中，如果找不到就创建一个inet_frag_queue，插入到hash表中。后面最重要的过程就是重组ip报文，所有的步骤集中在了ip_frag_queue函数中。这个函数过程分为这几步：</p>
+<ol>
+<li>从当前分段中确定当前sk_buff的offset和end。</li>
+<li>根据offset确定在当前sk_buff在inet_frag_queue中的位置。</li>
+<li>处理当前sk_buff和prev sk_buff重叠的数据的情况</li>
+<li>处理当前sk_buff和next sk_buff重叠的数据的情况</li>
+<li>把当前sk_buff加入到inet_frag_queue中的链表中，更新相关数据</li>
+<li>判断如果当前ip报文的所有分组都接收完毕，调用ip_frag_reasm函数重新装填ip报文</li>
+</ol>
+<p><strong>在处理重叠的时候，默认重叠部分都是优先采用offset靠前sk_buff中的数据</strong></p>
+<p>下面分布说明重组过程</p>
+<h6>1.从当前分段中确定当前sk_buff的offset和end</h6>
+<p><pre><code>
+    ecn = ip4_frag_ecn(ip_hdr(skb)-&gt;tos); 
+    offset = ntohs(ip_hdr(skb)-&gt;frag_off); //16位包括3位标志位，13位片内偏移
+    flags = offset &amp; ~IP_OFFSET; //获得3位标志位
+    offset &amp;= IP_OFFSET; //13位片内偏移
+    offset &lt;&lt;= 3;       /<em> offset is in 8-byte chunks </em>///13位片内偏移，这个表示按照8位为一个偏移，所以要乘以8
+    ihl = ip_hdrlen(skb);</p>
+<div class="highlight"><pre><span class="cm">/* Determine the position of this fragment. */</span>
+<span class="c1">//按照offset和sk_buff的len，计算出这个报文中数据的结束的位置，len表示从头部开始到最后的数据结束长度，所以计算数据的结束的位置，要减去头部的长度ihl</span>
+<span class="k">end</span> <span class="o">=</span> <span class="n">offset</span> <span class="o">+</span> <span class="n">skb</span><span class="o">-&gt;</span><span class="n">len</span> <span class="o">-</span> <span class="n">ihl</span><span class="p">;</span>
+<span class="n">err</span> <span class="o">=</span> <span class="o">-</span><span class="no">EINVAL</span><span class="p">;</span>
+<span class="c1">//更新q.len，表示接收分段的最大的结束的位置。</span>
+<span class="cm">/* Is this the final fragment? */</span>
+<span class="k">if</span> <span class="p">((</span><span class="n">flags</span> <span class="o">&amp;</span> <span class="no">IP_MF</span><span class="p">)</span> <span class="o">==</span> <span class="mh">0</span><span class="p">)</span> <span class="p">{</span>
+    <span class="cm">/* If we already have some bits beyond end</span>
+<span class="cm">     * or have different end, the segment is corrrupted.</span>
+<span class="cm">     */</span>
+    <span class="k">if</span> <span class="p">(</span><span class="k">end</span> <span class="o">&lt;</span> <span class="n">qp</span><span class="o">-&gt;</span><span class="n">q</span><span class="p">.</span><span class="n">len</span> <span class="o">||</span>
+        <span class="p">((</span><span class="n">qp</span><span class="o">-&gt;</span><span class="n">q</span><span class="p">.</span><span class="n">last_in</span> <span class="o">&amp;</span> <span class="no">INET_FRAG_LAST_IN</span><span class="p">)</span> <span class="o">&amp;&amp;</span> <span class="k">end</span> <span class="o">!=</span> <span class="n">qp</span><span class="o">-&gt;</span><span class="n">q</span><span class="p">.</span><span class="n">len</span><span class="p">))</span>
+        <span class="n">goto</span> <span class="n">err</span><span class="p">;</span>
+    <span class="n">qp</span><span class="o">-&gt;</span><span class="n">q</span><span class="p">.</span><span class="n">last_in</span> <span class="o">|=</span> <span class="no">INET_FRAG_LAST_IN</span><span class="p">;</span>
+    <span class="n">qp</span><span class="o">-&gt;</span><span class="n">q</span><span class="p">.</span><span class="n">len</span> <span class="o">=</span> <span class="k">end</span><span class="p">;</span>
+<span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="k">end</span><span class="o">&amp;</span><span class="mh">7</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">end</span> <span class="o">&amp;=</span> <span class="o">~</span><span class="mh">7</span><span class="p">;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">skb</span><span class="o">-&gt;</span><span class="n">ip_summed</span> <span class="o">!=</span> <span class="no">CHECKSUM_UNNECESSARY</span><span class="p">)</span>
+            <span class="n">skb</span><span class="o">-&gt;</span><span class="n">ip_summed</span> <span class="o">=</span> <span class="no">CHECKSUM_NONE</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="p">(</span><span class="k">end</span> <span class="o">&gt;</span> <span class="n">qp</span><span class="o">-&gt;</span><span class="n">q</span><span class="p">.</span><span class="n">len</span><span class="p">)</span> <span class="p">{</span>
+        <span class="cm">/* Some bits beyond end -&gt; corruption. */</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">qp</span><span class="o">-&gt;</span><span class="n">q</span><span class="p">.</span><span class="n">last_in</span> <span class="o">&amp;</span> <span class="no">INET_FRAG_LAST_IN</span><span class="p">)</span>
+            <span class="n">goto</span> <span class="n">err</span><span class="p">;</span>
+        <span class="n">qp</span><span class="o">-&gt;</span><span class="n">q</span><span class="p">.</span><span class="n">len</span> <span class="o">=</span> <span class="k">end</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+
+
+<p></code></pre></p>
+<h6>2.根据offset确定在当前sk_buff在inet_frag_queue中的位置</h6>
+<pre><code>
+    //首先从结尾开始尝试比较sk_buff的位置，如果大于prev，就证明sk_buff在结尾的后面，就不用递归确定位置了
+    prev = qp->q.fragments_tail;
+    if (!prev || FRAG_CB(prev)->offset < offset) {
+        next = NULL;
+        goto found;
+    }
+    //从开始开始递归比较offset，确定位置，
+    prev = NULL;
+    for (next = qp->q.fragments; next != NULL; next = next->next) {
+        if (FRAG_CB(next)->offset >= offset)
+            break;  /* bingo! */
+        prev = next;
+    }
+</code></pre>
+
+<p>这样已经确定出当前sk_buff在inet_frag_queue位置，有了prev和next指针，可能这两个指针都是空</p>
+<h6>3.处理当前sk_buff和prev sk_buff重叠的数据的情况</h6>
+<p>我们唯一可以确定的事情就是current和prev直接offset的关系，是prev&lt;=current，但是结尾的位置关系不确定。
+<img src="http://i1166.photobucket.com/albums/q601/djjsindy/my%20blog/ScreenShot2014-06-19at113152AM_zps79bf0c7b.png" width="300"></p>
+<p>从图中可以看出前两种情况都是ok的，第三种情况出现了重叠情况，这样会把重叠部分从current中去掉，这样重叠部分取自prev分段。</p>
+<p>这里重叠部分不会更新meat，因为current的增加的数据量在第5步有更新。prev的数据量没有变化
+<pre><code>
+if (prev) {
+        //计算重叠部分即prev-&gt;end-current-&gt;offset
+        int i = (FRAG_CB(prev)-&gt;offset + prev-&gt;len) - offset;
+        if (i &gt; 0) {
+            //更新当前的offset＋i，即忽略掉current重叠的部分
+            offset += i;
+            err = -EINVAL;
+            if (end &lt;= offset)
+                goto err;
+            err = -ENOMEM;
+            if (!pskb_pull(skb, i))
+                goto err;
+            if (skb-&gt;ip_summed != CHECKSUM_UNNECESSARY)
+                skb-&gt;ip_summed = CHECKSUM_NONE;
+        }
+    }
+</code></pre></p>
+<h6>4.处理当前sk_buff和next sk_buff重叠的数据的情况</h6>
+<p><img src="http://i1166.photobucket.com/albums/q601/djjsindy/my%20blog/ScreenShot2014-06-19at115541AM_zpsbd2e8f5d.png" width="300"/></p>
+<p>从上图中可以看出前两种情况都是ok得，后面两种都是需要处理得重叠情况，第三种需要把next去掉重叠部分，然后meat减少重叠得长度，第四种情况是完全重叠得情况，由于重叠部分优先使用offset考前的sk_buff,所以这种情况下去掉next就可以了。</p>
+<pre><code>
+while (next && FRAG_CB(next)->offset < end) {
+        //计算重叠的长度
+        int i = end - FRAG_CB(next)->offset; /* overlap is 'i' bytes */
+        //第三种情况，表示部分重叠，可以知道next的next如果有的话，肯定不和current重叠，所以最后break
+        if (i < next->len) {
+            /* Eat head of the next overlapped fragment
+             * and leave the loop. The next ones cannot overlap.
+             */
+             //折叠next
+            if (!pskb_pull(next, i))
+                goto err;
+            //更新next的offset，使offset到达current的结束边缘
+            FRAG_CB(next)->offset += i;
+            //更新实际接收数据量，因为重叠部分被处理掉了
+            qp->q.meat -= i;
+            if (next->ip_summed != CHECKSUM_UNNECESSARY)
+                next->ip_summed = CHECKSUM_NONE;
+            break;
+        } else {
+            //完全重叠的情况，只需要从链表中去掉next
+            struct sk_buff *free_it = next;
+
+            /* Old fragment is completely overridden with
+             * new one drop it.
+             */
+            next = next->next;
+            //去掉next
+            if (prev)
+                prev->next = next;
+            else
+                qp->q.fragments = next;
+            //减少next的数据量
+            qp->q.meat -= free_it->len;
+            frag_kfree_skb(qp->q.net, free_it);
+        }
+    }
+
+</code></pre>
+
+<h6>5.把当前sk_buff加入到inet_frag_queue中的链表中，更新相关数据</h6>
+<p>重叠sk_buff处理完毕了，紧接着就该把current加入到inet_frag_queue的链表中了，同时更新meat，更新mem大小，以便mem超过了high_thresh，回收数据。
+<pre><code>
+    FRAG_CB(skb)-&gt;offset = offset;
+    /<em> Insert this fragment in the chain of fragments. </em>/
+    //插入链表
+    skb-&gt;next = next;
+    if (!next)
+        qp-&gt;q.fragments_tail = skb;
+    if (prev)
+        prev-&gt;next = skb;
+    else
+        qp-&gt;q.fragments = skb;
+    dev = skb-&gt;dev;
+    if (dev) {
+        qp-&gt;iif = dev-&gt;ifindex;
+        skb-&gt;dev = NULL;
+    }
+    //更新meat，mem
+    qp-&gt;q.stamp = skb-&gt;tstamp;
+    qp-&gt;q.meat += skb-&gt;len;
+    qp-&gt;ecn |= ecn;
+    atomic_add(skb-&gt;truesize, &amp;qp-&gt;q.net-&gt;mem);
+</code></pre></p>
+<h6>6.判断如果当前ip报文的所有分组都接收完毕，调用ip_frag_reasm函数重新装填ip报文</h6>
+<p>判断ip报文所有分段接收完毕根据meat是否等于len,如果等于len，那么调用ip_frag_reasm函数，认为当前sk_buff是报文的第一个分组，把当前sk_buff赋予inet_frag_queue的第一个sk_buff，同时把其他分组放到sk_buff的frag_list中，同时更新sk_buff的其他参数
+<pre><code>
+//head就是本次接收的sk_buff，如果有prev，就是说当前sk_buff不是第一个位置的分段，需要让它变成第一个位置的分段
+if (prev) {
+        head = prev-&gt;next;
+        //fp是一个替代current的sk_buff
+        fp = skb_clone(head, GFP_ATOMIC);
+        if (!fp)
+            goto out_nomem;
+        //head的位置让fp替代
+        fp-&gt;next = head-&gt;next;
+        if (!fp-&gt;next)
+            qp-&gt;q.fragments_tail = fp;
+        prev-&gt;next = fp;
+        //把head变成第一个分段
+        skb_morph(head, qp-&gt;q.fragments);
+        head-&gt;next = qp-&gt;q.fragments-&gt;next;
+        kfree_skb(qp-&gt;q.fragments);
+        qp-&gt;q.fragments = head;
+    }
+</code></pre>
+后面更新sk_buff的相关参数
+<pre><code>
+    //把分段放入到frag_list中
+    skb_shinfo(head)-&gt;frag_list = head-&gt;next;
+    skb_push(head, head-&gt;data - skb_network_header(head));
+    //积累相关参数
+    for (fp=head-&gt;next; fp; fp = fp-&gt;next) {
+        head-&gt;data_len += fp-&gt;len;
+        head-&gt;len += fp-&gt;len;
+        if (head-&gt;ip_summed != fp-&gt;ip_summed)
+            head-&gt;ip_summed = CHECKSUM_NONE;
+        else if (head-&gt;ip_summed == CHECKSUM_COMPLETE)
+            head-&gt;csum = csum_add(head-&gt;csum, fp-&gt;csum);
+        head-&gt;truesize += fp-&gt;truesize;
+    }
+    atomic_sub(head-&gt;truesize, &amp;qp-&gt;q.net-&gt;mem);
+    head-&gt;next = NULL;
+    head-&gt;dev = dev;
+    head-&gt;tstamp = qp-&gt;q.stamp;
+    iph = ip_hdr(head);
+    iph-&gt;frag_off = 0;
+    iph-&gt;tot_len = htons(len);
+</code></pre></p>
+<h3>分段定时器</h3>
+<p>每个ip分段都会设置一个定时器，防止长时间分段接收不完全，占用内存结构。
+<pre><code>
+static void ip_expire(unsigned long arg)
+{
+    struct ipq <em>qp;
+    struct net </em>net;
+    qp = container_of((struct inet_frag_queue <em>) arg, struct ipq, q);
+    net = container_of(qp-&gt;q.net, struct net, ipv4.frags);
+    spin_lock(&amp;qp-&gt;q.lock);
+    //如果接收完全了，就必要回收了
+    if (qp-&gt;q.last_in &amp; INET_FRAG_COMPLETE)
+        goto out;
+    //更新引用计数，删除timer，从lru链表中删除qp
+    ipq_kill(qp);
+    IP_INC_STATS_BH(net, IPSTATS_MIB_REASMTIMEOUT);
+    IP_INC_STATS_BH(net, IPSTATS_MIB_REASMFAILS);
+    //如果接收第一个分段
+    if ((qp-&gt;q.last_in &amp; INET_FRAG_FIRST_IN) &amp;&amp; qp-&gt;q.fragments != NULL) {
+        struct sk_buff </em>head = qp-&gt;q.fragments;
+        const struct iphdr <em>iph;
+        int err;
+        rcu_read_lock();
+        head-&gt;dev = dev_get_by_index_rcu(net, qp-&gt;iif);
+        if (!head-&gt;dev)
+            goto out_rcu_unlock;
+        /</em> skb dst is stale, drop it, and perform route lookup again */
+        skb_dst_drop(head);
+        iph = ip_hdr(head);
+        err = ip_route_input_noref(head, iph-&gt;daddr, iph-&gt;saddr,
+                       iph-&gt;tos, head-&gt;dev);
+        if (err)
+            goto out_rcu_unlock;
+        if (qp-&gt;user == IP_DEFRAG_CONNTRACK_IN &amp;&amp;
+            skb_rtable(head)-&gt;rt_type != RTN_LOCAL)
+            goto out_rcu_unlock;
+        //发送icmp告诉对端，分段超时了
+        icmp_send(head, ICMP_TIME_EXCEEDED, ICMP_EXC_FRAGTIME, 0);
+out_rcu_unlock:
+        rcu_read_unlock();
+    }
+out:
+    spin_unlock(&amp;qp-&gt;q.lock);
+    //释放分段中的结构
+    ipq_put(qp);
+}
+</code></pre></p>
+<h3>内存回收</h3>
+<p>在接收分段的过程中，ipv4.frags.mem表示分段未接收完全，分段占用的内存空间，在某个ip报文接收过程中，接收到了一个分段会增加相应的数据量，当这个报文分段接收完全后，会减少这个相应数据量，每次接收到新的分段的时候，都要检查这个mem，如果它高于high_thresh，就会开始回收，会牺牲一些未接收完全的inet_frag_queue，直到mem达到low_thresh。netns_frags里面的lru_list，就是记录还未接收完全分段的inet_frag_queue。当接收分段的时候，会把当前inet_frag_queue，移动到lru_list的结尾，回收inet_frag_queue的时候是从lru_list的头部开始回收。回收的函数是inet_frag_evictor
+<pre><code>
+int inet_frag_evictor(struct netns_frags <em>nf, struct inet_frags </em>f)
+{
+    struct inet_frag_queue *q;
+    int work, evicted = 0;
+    //计算出需要回收的数据量
+    work = atomic_read(&amp;nf-&gt;mem) - nf-&gt;low_thresh;
+    while (work &gt; 0) {
+        read_lock(&amp;f-&gt;lock);
+        if (list_empty(&amp;nf-&gt;lru_list)) {
+            read_unlock(&amp;f-&gt;lock);
+            break;
+        }
+        //从lru_list中取出inet_frag_queue
+        q = list_first_entry(&amp;nf-&gt;lru_list,
+                struct inet_frag_queue, lru_list);
+        atomic_inc(&amp;q-&gt;refcnt);
+        read_unlock(&amp;f-&gt;lock);
+        spin_lock(&amp;q-&gt;lock);
+        //如果分段没有接收完全，证明q还在lru_list中
+        if (!(q-&gt;last_in &amp; INET_FRAG_COMPLETE))
+            inet_frag_kill(q, f);
+        spin_unlock(&amp;q-&gt;lock);
+        //回收inet_frag_queue，更新work
+        if (atomic_dec_and_test(&amp;q-&gt;refcnt))
+            inet_frag_destroy(q, f, &amp;work);
+        evicted++;
+    }
+    return evicted;
+}
+</code></pre></p>
+                </div><!-- /.entry-content -->
+        </article>
+</section>
+        </div><!--/span-->
+
+                <div class="span3 well sidebar-nav" id="sidebar">
+<ul class="nav nav-list">
+
+<li class="nav-header"><h4><i class="icon-folder-close icon-large"></i>Categories</h4></li>
+<li>
+<a href="/category/nginx.html">
+    <i class="icon-folder-open icon-large"></i>nginx
+</a>
+</li>
+<li>
+<a href="/category/ptmalloc.html">
+    <i class="icon-folder-open icon-large"></i>ptmalloc
+</a>
+</li>
+<li>
+<a href="/category/socket.html">
+    <i class="icon-folder-open icon-large"></i>socket
+</a>
+</li>
+<li>
+<a href="/category/tomcat.html">
+    <i class="icon-folder-open icon-large"></i>tomcat
+</a>
+</li>
+
+<li class="nav-header"><h4><i class="icon-tags icon-large"></i>Tags</h4></li>
+<li class="tag-0">
+    <a href="/tag/socket.html">
+        <i class="icon-tag icon-large"></i>socket
+    </a>
+</li>
+<li class="tag-2">
+    <a href="/tag/tomcat.html">
+        <i class="icon-tag icon-large"></i>tomcat
+    </a>
+</li>
+<li class="tag-1">
+    <a href="/tag/nginx.html">
+        <i class="icon-tag icon-large"></i>nginx
+    </a>
+</li>
+<li class="tag-2">
+    <a href="/tag/ptmalloc.html">
+        <i class="icon-tag icon-large"></i>ptmalloc
+    </a>
+</li>
+
+
+</ul>        </div><!--/.well -->
+
+      </div><!--/row-->
+
+      <hr>
+
+      <footer>
+        <address id="about">
+                Proudly powered by <a href="http://pelican.notmyidea.org/">Pelican <i class="icon-external-link"></i></a>,
+                                which takes great advantage of <a href="http://python.org">Python <i class="icon-external-link"></i></a>.
+        </address><!-- /#about -->
+
+        <p>The theme is from <a href="http://twitter.github.com/bootstrap/">Bootstrap from Twitter <i class="icon-external-link"></i></a>,
+                   and <a href="http://fortawesome.github.com/Font-Awesome/">Font-Awesome <i class="icon-external-link"></i></a>, thanks!</p>
+      </footer>
+
+    </div><!--/.fluid-container-->
+
+
+<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+try {
+	var pageTracker = _gat._getTracker("UA-43260693-1");
+pageTracker._trackPageview();
+} catch(err) {}</script>
+
+    <!-- Le javascript -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="/theme/js/jquery-1.7.2.min.js"></script>
+    <script src="/theme/js/bootstrap.min.js"></script>
+  </body>
+</html>
